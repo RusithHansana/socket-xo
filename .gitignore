@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.tsbuildinfo
+
+# BMAD
+_bmad/
+_bmad-*/
+.agent/
+.gemini/
+.github/

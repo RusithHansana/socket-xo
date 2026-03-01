@@ -1,0 +1,23 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "tsx --watch src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "cors": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "pino": "latest",
+    "socket.io": "^4.8.0"
+  },
+  "devDependencies": {
+    "@types/cors": "latest",
+    "@types/express": "latest",
+    "@types/node": "latest",
+    "pino-pretty": "latest",
+    "tsx": "latest",
+    "typescript": "^5.0.0"
+  }
+}
