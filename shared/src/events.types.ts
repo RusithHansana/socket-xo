@@ -2,7 +2,8 @@ import type { GameState, MovePayload } from './game.types';
 import type { ChatMessage } from './chat.types';
 
 // 5.3 InterServerEvents — empty for single-server MVP
-// export interface InterServerEvents {}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface InterServerEvents {}
 
 // 5.4 SocketData — per-socket metadata
 export interface SocketData {
