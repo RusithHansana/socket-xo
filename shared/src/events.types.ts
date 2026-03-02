@@ -1,18 +1,20 @@
 import type { GameState, MovePayload } from './game.types';
 import type { ChatMessage } from './chat.types';
 
-// 5.3 InterServerEvents — empty for single-server MVP
+/** Inter-server events — empty for single-server MVP. Reserved for future horizontal scaling. */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface InterServerEvents {}
 
-// 5.4 SocketData — per-socket metadata
+/** Per-socket metadata attached by the server on connection and available in every event handler. */
 export interface SocketData {
   playerId: string;
   roomId: string | null;
 }
 
-// 5.1 ClientToServerEvents — all event names in snake_case verb_noun (5.5)
-// All payload field names in camelCase (5.6)
+/**
+ * Events emitted **by the client** and handled by the server.
+ * All event names use `snake_case` verb_noun convention; payload fields use `camelCase`.
+ */
 export interface ClientToServerEvents {
   /** Join the matchmaking queue */
   join_queue: () => void;
@@ -28,8 +30,10 @@ export interface ClientToServerEvents {
   join_room: (payload: { roomId: string; playerId: string }) => void;
 }
 
-// 5.2 ServerToClientEvents — all event names in snake_case verb_noun (5.5)
-// All payload field names in camelCase (5.6)
+/**
+ * Events emitted **by the server** and handled by the client.
+ * All event names use `snake_case` verb_noun convention; payload fields use `camelCase`.
+ */
 export interface ServerToClientEvents {
   /** Acknowledged: player entered queue */
   queue_joined: () => void;
