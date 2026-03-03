@@ -9,7 +9,9 @@ export default function ErrorPage() {
     : 'Unexpected Error';
 
   const message = isRouteErrorResponse(error)
-    ? ((error.data as string) ?? 'Something went wrong.')
+    ? typeof error.data === 'string'
+      ? error.data
+      : ((error.data as { message?: string })?.message ?? 'Something went wrong.')
     : error instanceof Error
       ? error.message
       : 'An unknown error occurred.';

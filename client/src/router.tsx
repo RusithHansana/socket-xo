@@ -1,18 +1,52 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
-import LobbyPage from './pages/lobby-page';
-import AIGamePage from './pages/ai-game-page';
-import OnlineGamePage from './pages/online-game-page';
-import DevModePage from './pages/dev-mode-page';
 import ErrorPage from './pages/error-page';
 
+const LobbyPage = lazy(() => import('./pages/lobby-page'));
+const AIGamePage = lazy(() => import('./pages/ai-game-page'));
+const OnlineGamePage = lazy(() => import('./pages/online-game-page'));
+const DevModePage = lazy(() => import('./pages/dev-mode-page'));
+
 const routes = [
-  { path: '/', element: <LobbyPage />, errorElement: <ErrorPage /> },
-  { path: '/ai', element: <AIGamePage />, errorElement: <ErrorPage /> },
-  { path: '/game/:roomId', element: <OnlineGamePage />, errorElement: <ErrorPage /> },
+  {
+    path: '/',
+    element: (
+      <Suspense fallback={null}>
+        <LobbyPage />
+      </Suspense>
+    ),
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: '/ai',
+    element: (
+      <Suspense fallback={null}>
+        <AIGamePage />
+      </Suspense>
+    ),
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: '/game/:roomId',
+    element: (
+      <Suspense fallback={null}>
+        <OnlineGamePage />
+      </Suspense>
+    ),
+    errorElement: <ErrorPage />,
+  },
 ];
 
 if (import.meta.env.VITE_DEV_MODE === 'true') {
-  routes.push({ path: '/test-lab', element: <DevModePage />, errorElement: <ErrorPage /> });
+  routes.push({
+    path: '/test-lab',
+    element: (
+      <Suspense fallback={null}>
+        <DevModePage />
+      </Suspense>
+    ),
+    errorElement: <ErrorPage />,
+  });
 }
 
 export const router = createBrowserRouter(routes);
