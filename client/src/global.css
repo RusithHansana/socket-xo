@@ -95,6 +95,32 @@ img {
 }
 
 /* =====================================================
+   Base heading styles — use design token font shorthand
+   ===================================================== */
+h1 {
+  font: var(--font-heading-xl);
+  color: var(--color-text-primary);
+}
+
+h2 {
+  font: var(--font-heading-lg);
+  color: var(--color-text-primary);
+}
+
+h3 {
+  font: var(--font-heading-md);
+  color: var(--color-text-primary);
+}
+
+h4,
+h5,
+h6 {
+  font: var(--font-body);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* =====================================================
    Accessibility utilities
    ===================================================== */
 
@@ -106,7 +132,8 @@ img {
   padding: 0;
   margin: -1px;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+  clip: rect(0, 0, 0, 0); /* deprecated but kept for legacy browser support */
+  clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
 }
