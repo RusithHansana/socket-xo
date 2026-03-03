@@ -1,5 +1,4 @@
-import { createContext, useState } from 'react';
-import type { ReactNode } from 'react';
+import { createContext } from 'react';
 import type { Board, Symbol, GamePhase, GameOutcome, PlayerInfo } from 'shared';
 
 export interface GameContextState {
@@ -12,7 +11,7 @@ export interface GameContextState {
   moveCount: number;
 }
 
-const initialGameState: GameContextState = {
+export const initialGameState: GameContextState = {
   roomId: null,
   board: [
     [null, null, null],
@@ -27,8 +26,3 @@ const initialGameState: GameContextState = {
 };
 
 export const GameContext = createContext<GameContextState | undefined>(undefined);
-
-export function GameProvider({ children }: { children: ReactNode }) {
-  const [state] = useState<GameContextState>(initialGameState);
-  return <GameContext.Provider value={state}>{children}</GameContext.Provider>;
-}

@@ -1,7 +1,7 @@
 import { RouterProvider } from 'react-router-dom';
-import { ConnectionProvider } from './contexts/connection.context';
-import { GameProvider } from './contexts/game.context';
-import { ChatProvider } from './contexts/chat.context';
+import { ConnectionProvider } from './contexts/connection.provider';
+import { GameProvider } from './contexts/game.provider';
+import { ChatProvider } from './contexts/chat.provider';
 import { router } from './router';
 
 function App() {
