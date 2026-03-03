@@ -1,0 +1,16 @@
+{
+  "name": "SocketXO",
+  "short_name": "SocketXO",
+  "description": "Real-time multiplayer Tic-Tac-Toe with resilient reconnection",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F0F1A",
+  "theme_color": "#0F0F1A",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
