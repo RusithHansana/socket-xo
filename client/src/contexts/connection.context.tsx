@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useState } from 'react';
 import type { ReactNode } from 'react';
 
 // Connection states follow the FSM from architecture:
@@ -20,17 +20,9 @@ const initialConnectionState: ConnectionState = {
   status: 'idle',
 };
 
-const ConnectionContext = createContext<ConnectionState | undefined>(undefined);
+export const ConnectionContext = createContext<ConnectionState | undefined>(undefined);
 
 export function ConnectionProvider({ children }: { children: ReactNode }) {
   const [state] = useState<ConnectionState>(initialConnectionState);
   return <ConnectionContext.Provider value={state}>{children}</ConnectionContext.Provider>;
-}
-
-export function useConnectionStatus(): ConnectionState {
-  const ctx = useContext(ConnectionContext);
-  if (ctx === undefined) {
-    throw new Error('useConnectionStatus must be used within a ConnectionProvider');
-  }
-  return ctx;
 }
