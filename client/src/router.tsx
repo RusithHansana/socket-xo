@@ -14,7 +14,7 @@ const NotFoundPage = lazy(() => import('./pages/not-found-page'));
 /** Alphanumeric + hyphens, 1–50 chars, must not start or end with a hyphen. */
 const ROOM_ID_PATTERN = /^[a-z0-9]([a-z0-9-]{0,48}[a-z0-9])?$/i;
 
-function onlineGamePageLoader({ params }: LoaderFunctionArgs) {
+export function onlineGamePageLoader({ params }: LoaderFunctionArgs) {
   const { roomId } = params;
   if (!roomId || !ROOM_ID_PATTERN.test(roomId)) {
     throw new Response(
@@ -62,7 +62,12 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <RootLayout />,
-    errorElement: <ErrorPage />,
-    children: childRoutes,
+    children: [
+      {
+        // Pathless layout route — error boundary runs INSIDE RootLayout so context providers are available.
+        errorElement: <ErrorPage />,
+        children: childRoutes,
+      },
+    ],
   },
 ]);

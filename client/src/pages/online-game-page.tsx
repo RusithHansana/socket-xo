@@ -1,7 +1,10 @@
-import { useParams } from 'react-router-dom';
+import { useLoaderData } from 'react-router-dom';
+import type { onlineGamePageLoader } from '../router';
+
+type LoaderData = Awaited<ReturnType<typeof onlineGamePageLoader>>;
 
 export default function OnlineGamePage() {
-  const { roomId } = useParams<{ roomId: string }>();
+  const { roomId } = useLoaderData() as LoaderData;
 
   return (
     <main className="page">
