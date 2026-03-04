@@ -1,8 +1,8 @@
 export default function LobbyPage() {
   return (
-    <main>
+    <main className="page">
       <h1>Lobby</h1>
-      <p>Mode selection coming soon.</p>
+      <p className="page__description">Mode selection coming soon.</p>
     </main>
   );
 }

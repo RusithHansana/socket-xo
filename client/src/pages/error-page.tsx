@@ -1,8 +1,7 @@
-import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-dom';
+import { Link, useRouteError, isRouteErrorResponse } from 'react-router-dom';
 
 export default function ErrorPage() {
   const error = useRouteError();
-  const navigate = useNavigate();
 
   const title = isRouteErrorResponse(error)
     ? `${error.status} ${error.statusText}`
@@ -17,12 +16,10 @@ export default function ErrorPage() {
       : 'An unknown error occurred.';
 
   return (
-    <main>
+    <main className="page">
       <h1>{title}</h1>
-      <p>{message}</p>
-      <button type="button" onClick={() => navigate('/')}>
-        Go home
-      </button>
+      <p className="page__description">{message}</p>
+      <Link to="/">Go home</Link>
     </main>
   );
 }
