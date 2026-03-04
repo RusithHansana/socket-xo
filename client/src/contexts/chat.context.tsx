@@ -5,8 +5,9 @@ export interface ChatContextState {
   messages: ChatMessage[];
 }
 
-export const initialChatState: ChatContextState = {
-  messages: [],
-};
+/** Factory — always returns a fresh object to prevent shared mutable reference bugs. */
+export function getInitialChatState(): ChatContextState {
+  return { messages: [] };
+}
 
 export const ChatContext = createContext<ChatContextState | undefined>(undefined);

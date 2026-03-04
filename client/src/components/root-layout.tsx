@@ -17,12 +17,17 @@ export default function RootLayout() {
   const handle = lastMatch?.handle as { title?: string } | undefined;
   const pageTitle = handle?.title ? `${handle.title} | socket-xo` : 'socket-xo';
 
+  // Set title on every route change — no cleanup here to prevent same-session flicker.
   useEffect(() => {
     document.title = pageTitle;
+  }, [pageTitle]);
+
+  // Reset title only when the layout unmounts (full app teardown).
+  useEffect(() => {
     return () => {
       document.title = 'socket-xo';
     };
-  }, [pageTitle]);
+  }, []);
 
   return (
     <ConnectionProvider>

@@ -8,6 +8,15 @@ function safeSerialize(value: unknown): string {
   const seen = new WeakSet<object>();
   try {
     return JSON.stringify(value, (_, v: unknown) => {
+      // Error objects have non-enumerable properties — extract them explicitly
+      // so they are not silently omitted (JSON.stringify(new Error()) → '{}')
+      if (v instanceof Error) {
+        return {
+          name: v.name,
+          message: v.message,
+          ...(v.stack ? { stack: v.stack } : {}),
+        };
+      }
       if (typeof v === 'object' && v !== null) {
         if (seen.has(v as object)) return '[Circular]';
         seen.add(v as object);

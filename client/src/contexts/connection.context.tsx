@@ -15,8 +15,9 @@ export interface ConnectionState {
   status: ConnectionStatus;
 }
 
-export const initialConnectionState: ConnectionState = {
-  status: 'idle',
-};
+/** Factory — always returns a fresh object to prevent shared mutable reference bugs. */
+export function getInitialConnectionState(): ConnectionState {
+  return { status: 'idle' };
+}
 
 export const ConnectionContext = createContext<ConnectionState | undefined>(undefined);
