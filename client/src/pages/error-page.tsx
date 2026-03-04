@@ -1,4 +1,4 @@
-import { Link, useRouteError, isRouteErrorResponse } from 'react-router-dom';
+import { useRouteError, isRouteErrorResponse } from 'react-router-dom';
 
 /**
  * Safely serialises an unknown value to a JSON string.
@@ -54,7 +54,8 @@ export default function ErrorPage() {
     <main className="page">
       <h1>{title}</h1>
       <p className="page__description">{message}</p>
-      <Link to="/">Go home</Link>
+      {/* Use a full-page navigation anchor so all React state is discarded on fatal errors */}
+      <a href="/">Go home</a>
     </main>
   );
 }

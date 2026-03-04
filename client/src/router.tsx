@@ -62,9 +62,11 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <RootLayout />,
+    // Outer error boundary catches crashes in RootLayout itself (e.g. a context provider throwing).
+    errorElement: <ErrorPage />,
     children: [
       {
-        // Pathless layout route — error boundary runs INSIDE RootLayout so context providers are available.
+        // Inner error boundary catches per-route errors while keeping context providers alive.
         errorElement: <ErrorPage />,
         children: childRoutes,
       },
