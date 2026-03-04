@@ -1,15 +1,9 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { Outlet, useMatches } from 'react-router-dom';
 import { ConnectionProvider } from '../contexts/connection.provider';
 import { GameProvider } from '../contexts/game.provider';
 import { ChatProvider } from '../contexts/chat.provider';
 import PageLoader from './page-loader';
-
-// Re-export lazy pages so they are only ever instantiated once
-export const LobbyPage = lazy(() => import('../pages/lobby-page'));
-export const AIGamePage = lazy(() => import('../pages/ai-game-page'));
-export const OnlineGamePage = lazy(() => import('../pages/online-game-page'));
-export const DevModePage = lazy(() => import('../pages/dev-mode-page'));
 
 /**
  * Root layout route. Provides:

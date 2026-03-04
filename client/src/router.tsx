@@ -1,12 +1,15 @@
+import { lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import type { LoaderFunctionArgs, RouteObject } from 'react-router-dom';
-import RootLayout, {
-  LobbyPage,
-  AIGamePage,
-  OnlineGamePage,
-  DevModePage,
-} from './components/root-layout';
+import RootLayout from './components/root-layout';
 import ErrorPage from './pages/error-page';
+
+// Lazy-loaded page components (code-split per route)
+const LobbyPage = lazy(() => import('./pages/lobby-page'));
+const AIGamePage = lazy(() => import('./pages/ai-game-page'));
+const OnlineGamePage = lazy(() => import('./pages/online-game-page'));
+const DevModePage = lazy(() => import('./pages/dev-mode-page'));
+const NotFoundPage = lazy(() => import('./pages/not-found-page'));
 
 /** Alphanumeric + hyphens, 1–50 chars, must not start or end with a hyphen. */
 const ROOM_ID_PATTERN = /^[a-z0-9]([a-z0-9-]{0,48}[a-z0-9])?$/i;
@@ -39,15 +42,21 @@ const childRoutes: RouteObject[] = [
     element: <OnlineGamePage />,
     handle: { title: 'Online Game' },
   },
+  ...(import.meta.env.VITE_DEV_MODE === 'true'
+    ? [
+        {
+          path: 'test-lab',
+          element: <DevModePage />,
+          handle: { title: 'Dev Mode' },
+        } satisfies RouteObject,
+      ]
+    : []),
+  {
+    path: '*',
+    element: <NotFoundPage />,
+    handle: { title: '404' },
+  },
 ];
-
-if (import.meta.env.VITE_DEV_MODE === 'true') {
-  childRoutes.push({
-    path: 'test-lab',
-    element: <DevModePage />,
-    handle: { title: 'Dev Mode' },
-  });
-}
 
 export const router = createBrowserRouter([
   {
