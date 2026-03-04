@@ -55,7 +55,9 @@ export default function ErrorPage() {
       <h1>{title}</h1>
       <p className="page__description">{message}</p>
       {/* Use a full-page navigation anchor so all React state is discarded on fatal errors */}
-      <a href="/">Go home</a>
+      <a className="link" href="/">
+        Go home
+      </a>
     </main>
   );
 }

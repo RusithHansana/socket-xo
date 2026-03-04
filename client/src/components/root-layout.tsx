@@ -33,13 +33,6 @@ export default function RootLayout() {
     document.title = pageTitle;
   }, [pageTitle]);
 
-  // Reset title only when the layout unmounts (full app teardown).
-  useEffect(() => {
-    return () => {
-      document.title = 'socket-xo';
-    };
-  }, []);
-
   return (
     <ConnectionProvider>
       <GameProvider>

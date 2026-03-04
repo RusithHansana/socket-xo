@@ -159,6 +159,23 @@ h6 {
 }
 
 /* =====================================================
+   Link utility — design-system anchor class
+   ===================================================== */
+.link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition:
+    color var(--transition-fast),
+    text-decoration-color var(--transition-fast);
+}
+
+.link:hover {
+  color: var(--color-primary-hover);
+  text-decoration-color: currentColor;
+}
+
+/* =====================================================
    Page stub layout — used by route-level page components
    ===================================================== */
 .page {

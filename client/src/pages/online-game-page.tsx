@@ -1,7 +1,7 @@
 import { useLoaderData } from 'react-router-dom';
-import type { onlineGamePageLoader } from '../router';
 
-type LoaderData = Awaited<ReturnType<typeof onlineGamePageLoader>>;
+/** The resolved success payload from onlineGamePageLoader (redirect path never reaches the component). */
+type LoaderData = { roomId: string };
 
 /**
  * Runtime type guard — validates the loader data shape before use,
@@ -12,7 +12,7 @@ function asLoaderData(data: unknown): LoaderData {
     typeof data === 'object' &&
     data !== null &&
     'roomId' in data &&
-    typeof (data as { roomId: unknown }).roomId === 'string'
+    typeof (data as Record<string, unknown>).roomId === 'string'
   ) {
     return data as LoaderData;
   }
