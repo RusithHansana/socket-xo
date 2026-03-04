@@ -1,19 +1,12 @@
 import { RouterProvider } from 'react-router-dom';
-import { ConnectionProvider } from './contexts/connection.provider';
-import { GameProvider } from './contexts/game.provider';
-import { ChatProvider } from './contexts/chat.provider';
 import { router } from './router';
 
+/**
+ * App is intentionally a thin shell — context providers live inside
+ * RootLayout (a layout route) so they have access to React Router hooks.
+ */
 function App() {
-  return (
-    <ConnectionProvider>
-      <GameProvider>
-        <ChatProvider>
-          <RouterProvider router={router} />
-        </ChatProvider>
-      </GameProvider>
-    </ConnectionProvider>
-  );
+  return <RouterProvider router={router} />;
 }
 
 export default App;

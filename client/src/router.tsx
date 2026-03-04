@@ -1,4 +1,4 @@
-import { createBrowserRouter, redirect } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import type { LoaderFunctionArgs, RouteObject } from 'react-router-dom';
 import RootLayout, {
   LobbyPage,
@@ -14,7 +14,10 @@ const ROOM_ID_PATTERN = /^[a-z0-9]([a-z0-9-]{0,48}[a-z0-9])?$/i;
 function onlineGamePageLoader({ params }: LoaderFunctionArgs) {
   const { roomId } = params;
   if (!roomId || !ROOM_ID_PATTERN.test(roomId)) {
-    return redirect('/');
+    throw new Response(
+      `Invalid room ID: "${roomId ?? ''}". Room IDs must be 1–50 alphanumeric characters or hyphens.`,
+      { status: 404, statusText: 'Not Found' },
+    );
   }
   return { roomId };
 }
