@@ -13,16 +13,16 @@ import PageLoader from './page-loader';
  */
 export default function RootLayout() {
   const matches = useMatches();
+  const lastMatch = matches[matches.length - 1];
+  const handle = lastMatch?.handle as { title?: string } | undefined;
+  const pageTitle = handle?.title ? `${handle.title} | socket-xo` : 'socket-xo';
 
   useEffect(() => {
-    const previousTitle = document.title;
-    const lastMatch = matches[matches.length - 1];
-    const handle = lastMatch?.handle as { title?: string } | undefined;
-    document.title = handle?.title ? `${handle.title} | socket-xo` : 'socket-xo';
+    document.title = pageTitle;
     return () => {
-      document.title = previousTitle;
+      document.title = 'socket-xo';
     };
-  }, [matches]);
+  }, [pageTitle]);
 
   return (
     <ConnectionProvider>

@@ -11,18 +11,20 @@ export interface GameContextState {
   moveCount: number;
 }
 
-export const initialGameState: GameContextState = {
-  roomId: null,
-  board: [
-    [null, null, null],
-    [null, null, null],
-    [null, null, null],
-  ],
-  currentTurn: 'X',
-  players: [],
-  phase: 'waiting',
-  outcome: null,
-  moveCount: 0,
-};
+export function getInitialGameState(): GameContextState {
+  return {
+    roomId: null,
+    board: [
+      [null, null, null],
+      [null, null, null],
+      [null, null, null],
+    ],
+    currentTurn: 'X',
+    players: [],
+    phase: 'waiting',
+    outcome: null,
+    moveCount: 0,
+  };
+}
 
 export const GameContext = createContext<GameContextState | undefined>(undefined);

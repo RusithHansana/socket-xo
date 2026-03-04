@@ -10,8 +10,14 @@ export default function ErrorPage() {
   const message = isRouteErrorResponse(error)
     ? typeof error.data === 'string'
       ? error.data
-      : ((error.data as { message?: string })?.message ??
-        (error.data != null ? JSON.stringify(error.data) : 'Something went wrong.'))
+      : typeof error.data === 'object' &&
+          error.data !== null &&
+          'message' in error.data &&
+          typeof (error.data as Record<string, unknown>).message === 'string'
+        ? (error.data as { message: string }).message
+        : error.data != null
+          ? JSON.stringify(error.data)
+          : 'Something went wrong.'
     : error instanceof Error
       ? error.message
       : 'An unknown error occurred.';
