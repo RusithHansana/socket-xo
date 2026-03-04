@@ -28,3 +28,4 @@ export function getInitialGameState(): GameContextState {
 }
 
 export const GameContext = createContext<GameContextState | undefined>(undefined);
+GameContext.displayName = 'GameContext';

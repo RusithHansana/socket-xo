@@ -11,3 +11,4 @@ export function getInitialChatState(): ChatContextState {
 }
 
 export const ChatContext = createContext<ChatContextState | undefined>(undefined);
+ChatContext.displayName = 'ChatContext';

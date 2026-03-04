@@ -3,26 +3,40 @@ import { useRouteError, isRouteErrorResponse } from 'react-router-dom';
 /**
  * Safely serialises an unknown value to a JSON string.
  * Handles circular references and non-serialisable values without throwing.
+ *
+ * Uses a recursive ancestor-stack approach so that shared (non-circular)
+ * object references are serialised correctly at every occurrence; only true
+ * back-edges in the object graph are replaced with the '[Circular]' sentinel.
  */
 function safeSerialize(value: unknown): string {
-  const seen = new WeakSet<object>();
+  function toSerializable(val: unknown, ancestors: object[]): unknown {
+    // Error objects have non-enumerable properties — extract them explicitly
+    // so they are not silently omitted (JSON.stringify(new Error()) → '{}')
+    if (val instanceof Error) {
+      return {
+        name: val.name,
+        message: val.message,
+        ...(val.stack ? { stack: val.stack } : {}),
+      };
+    }
+    if (typeof val === 'object' && val !== null) {
+      // Back-edge in the current call-stack path → truly circular
+      if (ancestors.includes(val)) return '[Circular]';
+      const nextAncestors = [...ancestors, val];
+      if (Array.isArray(val)) {
+        return val.map((item) => toSerializable(item, nextAncestors));
+      }
+      const result: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
+        result[k] = toSerializable(v, nextAncestors);
+      }
+      return result;
+    }
+    return val;
+  }
+
   try {
-    return JSON.stringify(value, (_, v: unknown) => {
-      // Error objects have non-enumerable properties — extract them explicitly
-      // so they are not silently omitted (JSON.stringify(new Error()) → '{}')
-      if (v instanceof Error) {
-        return {
-          name: v.name,
-          message: v.message,
-          ...(v.stack ? { stack: v.stack } : {}),
-        };
-      }
-      if (typeof v === 'object' && v !== null) {
-        if (seen.has(v as object)) return '[Circular]';
-        seen.add(v as object);
-      }
-      return v;
-    });
+    return JSON.stringify(toSerializable(value, []));
   } catch {
     return '[Unserializable Error Data]';
   }

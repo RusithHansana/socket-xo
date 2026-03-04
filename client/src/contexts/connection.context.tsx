@@ -21,3 +21,4 @@ export function getInitialConnectionState(): ConnectionState {
 }
 
 export const ConnectionContext = createContext<ConnectionState | undefined>(undefined);
+ConnectionContext.displayName = 'ConnectionContext';

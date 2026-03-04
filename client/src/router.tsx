@@ -11,12 +11,18 @@ const OnlineGamePage = lazy(() => import('./pages/online-game-page'));
 const DevModePage = lazy(() => import('./pages/dev-mode-page'));
 const NotFoundPage = lazy(() => import('./pages/not-found-page'));
 
-/** Alphanumeric + hyphens, 1–50 chars, must not start or end with a hyphen. */
-const ROOM_ID_PATTERN = /^[a-z0-9]([a-z0-9-]{0,48}[a-z0-9])?$/i;
+/**
+ * Canonical slug pattern for room IDs.
+ * - Lowercase alphanumeric only (no uppercase, no `i` flag → enforces canonicality at the route level).
+ * - Segments separated by single hyphens; consecutive hyphens are implicitly prevented
+ *   because each segment must be `[a-z0-9]+`.
+ * - Total length capped at 50 characters via the separate length check below.
+ */
+const ROOM_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 export function onlineGamePageLoader({ params }: LoaderFunctionArgs) {
   const { roomId } = params;
-  if (!roomId || !ROOM_ID_PATTERN.test(roomId)) {
+  if (!roomId || roomId.length > 50 || !ROOM_ID_PATTERN.test(roomId)) {
     // Client-side redirect to the wildcard (*) route so NotFoundPage renders
     // with a <Link> for history-based navigation (no full page reload).
     return redirect('/not-found');
