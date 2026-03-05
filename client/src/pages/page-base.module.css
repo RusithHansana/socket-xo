@@ -1,0 +1,17 @@
+/* Shared base styles composed into every route-level page component. */
+
+.page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl) var(--space-lg);
+  gap: var(--space-md);
+  text-align: center;
+}
+
+.description {
+  color: var(--color-text-secondary);
+  font: var(--font-body);
+}

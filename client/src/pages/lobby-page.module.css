@@ -1,15 +1,7 @@
 .page {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-2xl) var(--space-lg);
-  gap: var(--space-md);
-  text-align: center;
+  composes: page from './page-base.module.css';
 }
 
 .description {
-  color: var(--color-text-secondary);
-  font: var(--font-body);
+  composes: description from './page-base.module.css';
 }
