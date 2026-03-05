@@ -194,6 +194,16 @@ h6 {
   font: var(--font-body);
 }
 
+.page__error-detail {
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-mono);
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+  max-width: 100%;
+}
+
 /* =====================================================
    Page loader — Suspense fallback spinner
    ===================================================== */

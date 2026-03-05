@@ -49,25 +49,39 @@ export default function ErrorPage() {
     ? `${error.status} ${error.statusText}`
     : 'Unexpected Error';
 
-  const message = isRouteErrorResponse(error)
-    ? typeof error.data === 'string'
-      ? error.data
-      : typeof error.data === 'object' &&
-          error.data !== null &&
-          'message' in error.data &&
-          typeof (error.data as Record<string, unknown>).message === 'string'
-        ? (error.data as { message: string }).message
-        : error.data != null
-          ? safeSerialize(error.data)
-          : 'Something went wrong.'
-    : error instanceof Error
-      ? error.message
-      : 'An unknown error occurred.';
+  let message: string;
+  let isSerializedJson = false;
+
+  if (isRouteErrorResponse(error)) {
+    if (typeof error.data === 'string') {
+      message = error.data;
+    } else if (
+      typeof error.data === 'object' &&
+      error.data !== null &&
+      'message' in error.data &&
+      typeof (error.data as Record<string, unknown>).message === 'string'
+    ) {
+      message = (error.data as { message: string }).message;
+    } else if (error.data != null) {
+      message = safeSerialize(error.data);
+      isSerializedJson = true;
+    } else {
+      message = 'Something went wrong.';
+    }
+  } else if (error instanceof Error) {
+    message = error.message;
+  } else {
+    message = 'An unknown error occurred.';
+  }
 
   return (
     <main className="page">
       <h1>{title}</h1>
-      <p className="page__description">{message}</p>
+      {isSerializedJson ? (
+        <pre className="page__error-detail">{message}</pre>
+      ) : (
+        <p className="page__description">{message}</p>
+      )}
       {/* Use a full-page navigation anchor so all React state is discarded on fatal errors */}
       <a className="link" href="/">
         Go home

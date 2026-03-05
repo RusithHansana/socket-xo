@@ -1,5 +1,9 @@
 import { Suspense, useEffect } from 'react';
 import { Outlet, useMatches } from 'react-router-dom';
+import { ConnectionProvider } from '../contexts/connection.provider';
+import { GameProvider } from '../contexts/game.provider';
+import { ChatProvider } from '../contexts/chat.provider';
+import PageLoader from './page-loader';
 
 /** Runtime type guard — narrows unknown route handle to an object with a string `title`. */
 function hasTitle(h: unknown): h is { title: string } {
@@ -10,10 +14,6 @@ function hasTitle(h: unknown): h is { title: string } {
     typeof (h as Record<string, unknown>).title === 'string'
   );
 }
-import { ConnectionProvider } from '../contexts/connection.provider';
-import { GameProvider } from '../contexts/game.provider';
-import { ChatProvider } from '../contexts/chat.provider';
-import PageLoader from './page-loader';
 
 /**
  * Root layout route. Provides:
