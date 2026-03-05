@@ -2,18 +2,37 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
-import { config } from './config';
-import { logger } from './utils/logger';
-import { registerSocketHandlers } from './socket-handler';
+import { config } from './config.js';
+import { logger } from './utils/logger.js';
+import { registerSocketHandlers } from './socket-handler.js';
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData,
+} from 'shared';
 
 const app = express();
 const httpServer = createServer(app);
 
-const io = new Server(httpServer, {
-  cors: {
-    origin: config.corsOrigin,
-    methods: ['GET', 'POST'],
+const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(
+  httpServer,
+  {
+    cors: {
+      origin: config.corsOrigin,
+      methods: ['GET', 'POST'],
+    },
   },
+);
+
+io.use((socket, next) => {
+  const playerId = socket.handshake.auth.playerId;
+  if (!playerId || typeof playerId !== 'string') {
+    return next(new Error('Missing playerId'));
+  }
+  socket.data.playerId = playerId;
+  socket.data.roomId = null;
+  next();
 });
 
 // In production, serve Vite-built SPA
