@@ -40,7 +40,12 @@ if (config.nodeEnv === 'production') {
   const clientDist = path.join(__dirname, '../../client/dist');
   app.use(express.static(clientDist));
   app.get('*', (_req, res) => {
-    res.sendFile(path.join(clientDist, 'index.html'));
+    res.sendFile(path.join(clientDist, 'index.html'), (err) => {
+      if (err) {
+        logger.error({ err }, 'Failed to serve SPA index.html');
+        res.status(503).end();
+      }
+    });
   });
 }
 

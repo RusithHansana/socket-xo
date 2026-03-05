@@ -48,7 +48,10 @@ export function registerSocketHandlers(
     socket.on('make_move', (payload) => {
       try {
         // TODO: implement in Story 1.6
-        logger.debug({ playerId: socket.data.playerId, payload }, 'make_move received');
+        logger.debug(
+          { playerId: socket.data.playerId, roomId: payload?.roomId },
+          'make_move received',
+        );
       } catch (err) {
         logger.error(
           {
