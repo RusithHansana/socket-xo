@@ -14,7 +14,7 @@ function asLoaderData(data: unknown): LoaderData {
     'roomId' in data &&
     typeof (data as Record<string, unknown>).roomId === 'string'
   ) {
-    return data as LoaderData;
+    return { roomId: (data as Record<string, unknown>).roomId as string };
   }
   throw new Error('OnlineGamePage: unexpected loader data shape — expected { roomId: string }');
 }
