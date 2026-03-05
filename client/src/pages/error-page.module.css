@@ -1,0 +1,25 @@
+.page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl) var(--space-lg);
+  gap: var(--space-md);
+  text-align: center;
+}
+
+.description {
+  color: var(--color-text-secondary);
+  font: var(--font-body);
+}
+
+.errorDetail {
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-mono);
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+  max-width: 100%;
+}

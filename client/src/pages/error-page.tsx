@@ -1,4 +1,5 @@
 import { useRouteError, isRouteErrorResponse } from 'react-router-dom';
+import styles from './error-page.module.css';
 
 /**
  * Safely serialises an unknown value to a JSON string.
@@ -13,10 +14,18 @@ function safeSerialize(value: unknown): string {
     // Error objects have non-enumerable properties — extract them explicitly
     // so they are not silently omitted (JSON.stringify(new Error()) → '{}')
     if (val instanceof Error) {
+      if (ancestors.includes(val)) return '[Circular]';
+      const nextAncestors = [...ancestors, val];
+      // Iterate own enumerable properties to capture custom fields (e.g. `code`)
+      const ownProps: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(val)) {
+        ownProps[k] = toSerializable(v, nextAncestors);
+      }
       return {
         name: val.name,
         message: val.message,
         ...(val.stack ? { stack: val.stack } : {}),
+        ...ownProps,
       };
     }
     if (typeof val === 'object' && val !== null) {
@@ -75,12 +84,12 @@ export default function ErrorPage() {
   }
 
   return (
-    <main className="page">
+    <main className={styles.page}>
       <h1>{title}</h1>
       {isSerializedJson ? (
-        <pre className="page__error-detail">{message}</pre>
+        <pre className={styles.errorDetail}>{message}</pre>
       ) : (
-        <p className="page__description">{message}</p>
+        <p className={styles.description}>{message}</p>
       )}
       {/* Use a full-page navigation anchor so all React state is discarded on fatal errors */}
       <a className="link" href="/">

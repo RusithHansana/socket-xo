@@ -19,13 +19,15 @@ function asLoaderData(data: unknown): LoaderData {
   throw new Error('OnlineGamePage: unexpected loader data shape — expected { roomId: string }');
 }
 
+import styles from './online-game-page.module.css';
+
 export default function OnlineGamePage() {
   const { roomId } = asLoaderData(useLoaderData());
 
   return (
-    <main className="page">
+    <main className={styles.page}>
       <h1>Online Game</h1>
-      <p className="page__description">Room: {roomId}</p>
+      <p className={styles.description}>Room: {roomId}</p>
     </main>
   );
 }

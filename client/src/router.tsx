@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { createBrowserRouter, redirect } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import type { LoaderFunctionArgs, RouteObject } from 'react-router-dom';
 import RootLayout from './components/root-layout';
 import ErrorPage from './pages/error-page';
@@ -23,9 +23,9 @@ const ROOM_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export function onlineGamePageLoader({ params }: LoaderFunctionArgs) {
   const { roomId } = params;
   if (!roomId || roomId.length > 50 || !ROOM_ID_PATTERN.test(roomId)) {
-    // Client-side redirect to the wildcard (*) route so NotFoundPage renders
-    // with a <Link> for history-based navigation (no full page reload).
-    return redirect('/not-found');
+    // Throw a 404 Response so React Router renders the route-level errorElement
+    // (NotFoundPage) in-place — no URL change, no history push, no back-button trap.
+    throw new Response('Not Found', { status: 404, statusText: 'Not Found' });
   }
   return { roomId };
 }
@@ -45,6 +45,9 @@ const childRoutes: RouteObject[] = [
     path: 'game/:roomId',
     loader: onlineGamePageLoader,
     element: <OnlineGamePage />,
+    // Route-level error boundary: renders NotFoundPage in-place for loader errors
+    // (e.g. invalid roomId). Keeps context providers alive and avoids a history push.
+    errorElement: <NotFoundPage />,
     handle: { title: 'Online Game' },
   },
   ...(import.meta.env.VITE_DEV_MODE === 'true'
