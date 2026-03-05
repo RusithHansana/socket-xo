@@ -18,7 +18,13 @@ export function registerSocketHandlers(
         // TODO: implement in Story 2.3
         logger.debug({ playerId: socket.data.playerId }, 'join_queue received');
       } catch (err) {
-        logger.error({ err, playerId: socket.data.playerId }, 'Error handling join_queue');
+        logger.error(
+          {
+            err: err instanceof Error ? err : new Error(String(err)),
+            playerId: socket.data.playerId,
+          },
+          'Error handling join_queue',
+        );
         socket.emit('error', { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' });
       }
     });
@@ -28,7 +34,13 @@ export function registerSocketHandlers(
         // TODO: implement in Story 2.3
         logger.debug({ playerId: socket.data.playerId }, 'leave_queue received');
       } catch (err) {
-        logger.error({ err, playerId: socket.data.playerId }, 'Error handling leave_queue');
+        logger.error(
+          {
+            err: err instanceof Error ? err : new Error(String(err)),
+            playerId: socket.data.playerId,
+          },
+          'Error handling leave_queue',
+        );
         socket.emit('error', { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' });
       }
     });
@@ -38,7 +50,13 @@ export function registerSocketHandlers(
         // TODO: implement in Story 1.6
         logger.debug({ playerId: socket.data.playerId, payload }, 'make_move received');
       } catch (err) {
-        logger.error({ err, playerId: socket.data.playerId }, 'Error handling make_move');
+        logger.error(
+          {
+            err: err instanceof Error ? err : new Error(String(err)),
+            playerId: socket.data.playerId,
+          },
+          'Error handling make_move',
+        );
         socket.emit('error', { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' });
       }
     });
@@ -47,11 +65,17 @@ export function registerSocketHandlers(
       try {
         // TODO: implement in Story 5.1
         logger.debug(
-          { playerId: socket.data.playerId, roomId: payload.roomId },
+          { playerId: socket.data.playerId, roomId: payload?.roomId },
           'send_chat received',
         );
       } catch (err) {
-        logger.error({ err, playerId: socket.data.playerId }, 'Error handling send_chat');
+        logger.error(
+          {
+            err: err instanceof Error ? err : new Error(String(err)),
+            playerId: socket.data.playerId,
+          },
+          'Error handling send_chat',
+        );
         socket.emit('error', { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' });
       }
     });
@@ -59,9 +83,15 @@ export function registerSocketHandlers(
     socket.on('reconnect_attempt', (payload) => {
       try {
         // TODO: implement in Story 2.1
-        logger.debug({ playerId: payload.playerId }, 'reconnect_attempt received');
+        logger.debug({ playerId: payload?.playerId }, 'reconnect_attempt received');
       } catch (err) {
-        logger.error({ err, playerId: socket.data.playerId }, 'Error handling reconnect_attempt');
+        logger.error(
+          {
+            err: err instanceof Error ? err : new Error(String(err)),
+            playerId: socket.data.playerId,
+          },
+          'Error handling reconnect_attempt',
+        );
         socket.emit('error', { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' });
       }
     });
@@ -69,9 +99,18 @@ export function registerSocketHandlers(
     socket.on('join_room', (payload) => {
       try {
         // TODO: implement in Story 4.1
-        logger.debug({ playerId: payload.playerId, roomId: payload.roomId }, 'join_room received');
+        logger.debug(
+          { playerId: payload?.playerId, roomId: payload?.roomId },
+          'join_room received',
+        );
       } catch (err) {
-        logger.error({ err, playerId: socket.data.playerId }, 'Error handling join_room');
+        logger.error(
+          {
+            err: err instanceof Error ? err : new Error(String(err)),
+            playerId: socket.data.playerId,
+          },
+          'Error handling join_room',
+        );
         socket.emit('error', { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' });
       }
     });

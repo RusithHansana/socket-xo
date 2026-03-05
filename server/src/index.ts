@@ -27,7 +27,7 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
 
 io.use((socket, next) => {
   const playerId = socket.handshake.auth.playerId;
-  if (!playerId || typeof playerId !== 'string') {
+  if (typeof playerId !== 'string' || playerId.trim() === '') {
     return next(new Error('Missing playerId'));
   }
   socket.data.playerId = playerId;
