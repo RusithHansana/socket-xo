@@ -1,0 +1,17 @@
+.page {
+  composes: page from './page-base.module.css';
+}
+
+.description {
+  composes: description from './page-base.module.css';
+}
+
+.errorDetail {
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-mono);
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+  max-width: 100%;
+}

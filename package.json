@@ -23,5 +23,8 @@
     "eslint-plugin-react-hooks": "latest",
     "prettier": "latest",
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "react-router-dom": "^7.13.1"
   }
 }

@@ -1,0 +1,7 @@
+.page {
+  composes: page from './page-base.module.css';
+}
+
+.description {
+  composes: description from './page-base.module.css';
+}
