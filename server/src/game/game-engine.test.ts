@@ -1167,12 +1167,13 @@ describe('validateMove — moveCount parity check', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkOutcome — board size limit', () => {
-  it('[AI-Review][HIGH] returns null for a board exceeding MAX_BOARD_SIZE without generating lines', () => {
+  it('[AI-Review][HIGH] throws Error for a board exceeding MAX_BOARD_SIZE without generating lines', () => {
     // A 25×25 board (> cap of 20) — generateWinningLines must NOT be called (OOM prevention).
+    // Changed from return null to throw Error to surface the programming error explicitly.
     const oversized: Board = Array.from({ length: 25 }, () =>
       Array.from({ length: 25 }, (): Symbol | null => null),
     ) as unknown as Board;
-    expect(checkOutcome(oversized, 0)).toBeNull();
+    expect(() => checkOutcome(oversized, 0)).toThrow(Error);
   });
 
   it('[AI-Review][HIGH] processes a board at exactly MAX_BOARD_SIZE without issue', () => {
