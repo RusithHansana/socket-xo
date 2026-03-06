@@ -747,3 +747,169 @@ describe('winningLinesCache — memory cap', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// validateMove — board size cap (DoS / OOM prevention)
+// ---------------------------------------------------------------------------
+
+describe('validateMove — board size cap', () => {
+  it('[AI-Review][HIGH] rejects state with board.length > MAX_BOARD_SIZE with INVALID_STATE', () => {
+    // A 25×25 board (> cap of 20) passed to validateMove must be rejected before
+    // generateWinningLines is ever called — preventing OOM from maliciously large input.
+    const bigBoard = Array.from({ length: 25 }, () =>
+      Array.from({ length: 25 }, (): Symbol | null => null),
+    ) as unknown as Board;
+    // moveCount=0 matches 0 pieces (passes the piece-count consistency check)
+    const state: GameState = { ...createGame(), board: bigBoard, moveCount: 0 };
+    const result = validateMove(state, { row: 0, col: 0 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review][HIGH] accepts state whose board is exactly MAX_BOARD_SIZE (boundary)', () => {
+    const board = Array.from({ length: 20 }, () =>
+      Array.from({ length: 20 }, (): Symbol | null => null),
+    ) as unknown as Board;
+    const state: GameState = { ...createGame(), board, moveCount: 0, currentTurn: 'X' };
+    const result = validateMove(state, { row: 0, col: 0 }, 'X');
+    // Should not be rejected for board size — other checks may fire, but not INVALID_STATE for size
+    if (!result.valid) {
+      expect(result.code).not.toBe('INVALID_STATE');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyMove — roomId sanitization
+// ---------------------------------------------------------------------------
+
+describe('applyMove — roomId sanitization', () => {
+  it('[AI-Review][MEDIUM] sanitizes oversized roomId from a tampered input state', () => {
+    // createGame caps roomId to 256 chars, but a tampered state could carry a longer string.
+    // applyMove must not propagate it into the returned state.
+    const longRoomId = 'r'.repeat(300);
+    const state: GameState = { ...createGame(), roomId: longRoomId };
+    const next = applyMove(state, { row: 0, col: 0 }, 'X');
+    expect(next.roomId.length).toBeLessThanOrEqual(256);
+    expect(next.roomId).toBe('r'.repeat(256));
+  });
+
+  it('[AI-Review][MEDIUM] preserves roomId within the 256-character cap unchanged', () => {
+    const state = createGame('room-normal');
+    const next = applyMove(state, { row: 0, col: 0 }, 'X');
+    expect(next.roomId).toBe('room-normal');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyMove — player field sanitization
+// ---------------------------------------------------------------------------
+
+describe('applyMove — player field sanitization', () => {
+  it('[AI-Review][MEDIUM] strips arbitrary extra properties from player objects in returned state', () => {
+    // Inject an extra property directly onto a player in an already-created state.
+    // applyMove must enumerate only the known PlayerInfo fields — _extra is never copied.
+    const state = createGame('room-1', [
+      {
+        playerId: 'p1',
+        displayName: 'Alice',
+        avatarUrl: '',
+        symbol: 'X' as const,
+        connected: true,
+      },
+    ]);
+    (state.players[0] as unknown as Record<string, unknown>)._extra = 'injected';
+    const next = applyMove(state, { row: 0, col: 0 }, 'X');
+    expect((next.players[0] as unknown as Record<string, unknown>)._extra).toBeUndefined();
+  });
+
+  it('[AI-Review][MEDIUM] retains all legitimate PlayerInfo fields in returned state', () => {
+    const players: PlayerInfo[] = [
+      {
+        playerId: 'p1',
+        displayName: 'Alice',
+        avatarUrl: 'https://example.com/a.png',
+        symbol: 'X',
+        connected: true,
+      },
+    ];
+    const state = createGame('room-2', players);
+    const next = applyMove(state, { row: 0, col: 0 }, 'X');
+    expect(next.players[0]).toEqual({
+      playerId: 'p1',
+      displayName: 'Alice',
+      avatarUrl: 'https://example.com/a.png',
+      symbol: 'X',
+      connected: true,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkOutcome — draw with tampered moveCount
+// ---------------------------------------------------------------------------
+
+describe('checkOutcome — draw with tampered moveCount', () => {
+  it('[AI-Review][MEDIUM] returns draw when moveCount exceeds size*size (tampered higher)', () => {
+    // moveCount=10 (> 9 = 3×3) with a full board and no winner — should still conclude as draw.
+    // Old code: === 9 would miss count=10, leaving the game stuck indefinitely.
+    // New code: >= 9 correctly catches any over-count.
+    const board: Board = [
+      ['X', 'O', 'X'],
+      ['X', 'X', 'O'],
+      ['O', 'X', 'O'],
+    ];
+    expect(checkOutcome(board, 10)?.type).toBe('draw');
+    expect(checkOutcome(board, 10)?.winner).toBeNull();
+  });
+
+  it('[AI-Review][MEDIUM] still returns draw at exactly size*size (no regression)', () => {
+    const board: Board = [
+      ['X', 'O', 'X'],
+      ['X', 'X', 'O'],
+      ['O', 'X', 'O'],
+    ];
+    expect(checkOutcome(board, 9)?.type).toBe('draw');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyMove — sparse board rows (densification)
+// ---------------------------------------------------------------------------
+
+describe('applyMove — sparse board rows', () => {
+  it('[AI-Review][LOW] correctly applies move when a board row has a sparse hole (densifies to null)', () => {
+    // A sparse array hole (created by `delete arr[i]`) is skipped by `.map()`.
+    // Array.from iterates ALL indices, converting the hole to null via `?? null`.
+    const sparseRow: (Symbol | null)[] = [null, null, null];
+    delete (sparseRow as unknown as Record<number, unknown>)[0]; // hole at index 0
+    const state: GameState = {
+      ...createGame(),
+      board: [sparseRow, [null, null, null], [null, null, null]] as Board,
+    };
+    const next = applyMove(state, { row: 0, col: 1 }, 'X');
+    expect(next.board[0][1]).toBe('X'); // target cell set
+    expect(next.board[0][0]).toBeNull(); // sparse hole densified to null
+    expect(next.board[0][2]).toBeNull(); // unmodified cell preserved
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyMove — phase assertion
+// ---------------------------------------------------------------------------
+
+describe('applyMove — phase assertion', () => {
+  it('[AI-Review][LOW] throws when state.phase is "finished"', () => {
+    const state: GameState = { ...createGame(), phase: 'finished' };
+    expect(() => applyMove(state, { row: 0, col: 0 }, 'X')).toThrow();
+  });
+
+  it('[AI-Review][LOW] throws when state.phase is "waiting"', () => {
+    const state: GameState = { ...createGame(), phase: 'waiting' };
+    expect(() => applyMove(state, { row: 0, col: 0 }, 'X')).toThrow();
+  });
+
+  it('[AI-Review][LOW] does not throw when state.phase is "playing"', () => {
+    expect(() => applyMove(createGame(), { row: 0, col: 0 }, 'X')).not.toThrow();
+  });
+});

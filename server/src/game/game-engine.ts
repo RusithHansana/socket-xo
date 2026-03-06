@@ -5,6 +5,8 @@ import { BOARD_SIZE } from 'shared';
 const winningLinesCache = new Map<number, Position[][]>();
 /** Upper bound on cached board sizes — prevents unbounded memory growth from arbitrary input. */
 const MAX_WINNING_LINES_CACHE_SIZE = 20;
+/** Maximum board size accepted by validateMove — prevents OOM in generateWinningLines from untrusted input. */
+const MAX_BOARD_SIZE = 20;
 
 /**
  * Generate all winning lines (rows, columns, diagonals) for an n×n board.
@@ -78,6 +80,15 @@ export function validateMove(
       valid: false,
       code: 'INVALID_STATE',
       message: 'Game state must have a valid board array.',
+    };
+  }
+
+  // Reject boards exceeding MAX_BOARD_SIZE — prevents OOM in generateWinningLines from untrusted input
+  if (state.board.length > MAX_BOARD_SIZE) {
+    return {
+      valid: false,
+      code: 'INVALID_STATE',
+      message: `Board size must not exceed ${MAX_BOARD_SIZE}.`,
     };
   }
 
@@ -191,11 +202,19 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
     throw new TypeError('applyMove: state.board must be a valid array');
   }
 
+  if (state.phase !== 'playing') {
+    throw new Error(
+      `applyMove: Cannot apply a move — game is not in "playing" phase (current: "${state.phase}").`,
+    );
+  }
+
   const newBoard: Board = state.board.map((r, rIdx) => {
     if (!Array.isArray(r)) {
       throw new TypeError(`applyMove: state.board[${rIdx}] must be a valid array`);
     }
-    return r.map((cell, cIdx) => (rIdx === row && cIdx === col ? symbol : cell));
+    return Array.from({ length: r.length }, (_, cIdx) =>
+      rIdx === row && cIdx === col ? symbol : (r[cIdx] ?? null),
+    ) as (Symbol | null)[];
   });
 
   const newMoveCount = state.moveCount + 1;
@@ -204,10 +223,16 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
   // Explicitly enumerate all GameState properties — prevents arbitrary
   // payload properties from persisting into the returned state object.
   return {
-    roomId: state.roomId,
+    roomId: typeof state.roomId === 'string' ? state.roomId.slice(0, MAX_ROOM_ID_LENGTH) : '',
     board: newBoard,
     currentTurn: state.currentTurn === 'X' ? 'O' : 'X',
-    players: (Array.isArray(state.players) ? state.players : []).map((p) => ({ ...p })),
+    players: (Array.isArray(state.players) ? state.players : []).map((p) => ({
+      playerId: p.playerId,
+      displayName: p.displayName,
+      avatarUrl: p.avatarUrl,
+      symbol: p.symbol,
+      connected: p.connected,
+    })),
     phase: outcome !== null ? 'finished' : 'playing',
     outcome,
     moveCount: newMoveCount,
@@ -238,7 +263,7 @@ export function checkOutcome(board: Board, moveCount: number): GameOutcome | nul
     }
   }
 
-  if (moveCount === size * size) {
+  if (moveCount >= size * size) {
     return { type: 'draw', winner: null, winningLine: null };
   }
 
