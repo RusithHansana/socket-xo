@@ -54,6 +54,27 @@ describe('createGame', () => {
     expect(state.roomId).toBe('');
     expect(state.players).toEqual([]);
   });
+
+  it('[AI-Review] clones the players array — mutating original does not affect state', () => {
+    const players = [
+      {
+        playerId: 'p1',
+        displayName: 'Alice',
+        avatarUrl: '',
+        symbol: 'X' as const,
+        connected: true,
+      },
+    ];
+    const state = createGame('room-1', players);
+    players.push({
+      playerId: 'p2',
+      displayName: 'Bob',
+      avatarUrl: '',
+      symbol: 'O' as const,
+      connected: true,
+    });
+    expect(state.players).toHaveLength(1);
+  });
 });
 
 // ---------------------------------------------------------------------------

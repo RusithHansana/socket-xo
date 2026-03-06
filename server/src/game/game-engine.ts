@@ -1,52 +1,22 @@
 import type { GameState, Board, Symbol, Position, GameOutcome, PlayerInfo } from 'shared';
 import { BOARD_SIZE } from 'shared';
 
-/** All 8 winning lines on a 3×3 board (3 rows, 3 columns, 2 diagonals). */
-const WINNING_LINES: Position[][] = [
-  // Rows
-  [
-    { row: 0, col: 0 },
-    { row: 0, col: 1 },
-    { row: 0, col: 2 },
-  ],
-  [
-    { row: 1, col: 0 },
-    { row: 1, col: 1 },
-    { row: 1, col: 2 },
-  ],
-  [
-    { row: 2, col: 0 },
-    { row: 2, col: 1 },
-    { row: 2, col: 2 },
-  ],
-  // Columns
-  [
-    { row: 0, col: 0 },
-    { row: 1, col: 0 },
-    { row: 2, col: 0 },
-  ],
-  [
-    { row: 0, col: 1 },
-    { row: 1, col: 1 },
-    { row: 2, col: 1 },
-  ],
-  [
-    { row: 0, col: 2 },
-    { row: 1, col: 2 },
-    { row: 2, col: 2 },
-  ],
-  // Diagonals
-  [
-    { row: 0, col: 0 },
-    { row: 1, col: 1 },
-    { row: 2, col: 2 },
-  ],
-  [
-    { row: 0, col: 2 },
-    { row: 1, col: 1 },
-    { row: 2, col: 0 },
-  ],
-];
+/** Generate all winning lines (rows, columns, diagonals) for an n×n board. */
+function generateWinningLines(size: number): Position[][] {
+  const lines: Position[][] = [];
+  for (let r = 0; r < size; r++) {
+    lines.push(Array.from({ length: size }, (_, c) => ({ row: r, col: c })));
+  }
+  for (let c = 0; c < size; c++) {
+    lines.push(Array.from({ length: size }, (_, r) => ({ row: r, col: c })));
+  }
+  lines.push(Array.from({ length: size }, (_, i) => ({ row: i, col: i })));
+  lines.push(Array.from({ length: size }, (_, i) => ({ row: i, col: size - 1 - i })));
+  return lines;
+}
+
+/** All winning lines for the configured board size (rows, columns, diagonals). */
+const WINNING_LINES: Position[][] = generateWinningLines(BOARD_SIZE);
 
 /**
  * Creates a fresh game state with an empty board.
@@ -60,7 +30,7 @@ export function createGame(roomId = '', players: PlayerInfo[] = []): GameState {
     roomId,
     board,
     currentTurn: 'X',
-    players,
+    players: [...players],
     phase: 'playing',
     outcome: null,
     moveCount: 0,
@@ -137,7 +107,7 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
     ...state,
     board: newBoard,
     moveCount: newMoveCount,
-    currentTurn: symbol === 'X' ? 'O' : 'X',
+    currentTurn: state.currentTurn === 'X' ? 'O' : 'X',
     phase: outcome !== null ? 'finished' : 'playing',
     outcome,
   };
