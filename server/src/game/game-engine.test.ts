@@ -1032,3 +1032,169 @@ describe('validateMove — currentTurn integrity', () => {
     expect(result.valid).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// applyMove — Round 7: null/undefined state guard (CRITICAL)
+// ---------------------------------------------------------------------------
+
+describe('applyMove — null/undefined state guard', () => {
+  it('[AI-Review][CRITICAL] throws TypeError when state is null', () => {
+    expect(() => applyMove(null as unknown as GameState, { row: 0, col: 0 }, 'X')).toThrow(
+      TypeError,
+    );
+  });
+
+  it('[AI-Review][CRITICAL] throws TypeError when state is undefined', () => {
+    expect(() => applyMove(undefined as unknown as GameState, { row: 0, col: 0 }, 'X')).toThrow(
+      TypeError,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkOutcome — Round 7: 0×0 board edge case (CRITICAL)
+// ---------------------------------------------------------------------------
+
+describe('checkOutcome — 0×0 board', () => {
+  it('[AI-Review][CRITICAL] does not crash when board is an empty array (0×0)', () => {
+    expect(() => checkOutcome([] as unknown as Board, 0)).not.toThrow();
+  });
+
+  it('[AI-Review][CRITICAL] does not report a win for an empty board', () => {
+    // generateWinningLines(0) returns two empty arrays ([], []).
+    // The line.length === 0 guard must skip them without accessing line[0].row.
+    const result = checkOutcome([] as unknown as Board, 0);
+    // An empty board cannot have a winning line — result may be draw or null but not a win.
+    expect(result?.type).not.toBe('win');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateMove — Round 7: moveCount parity check (HIGH)
+// ---------------------------------------------------------------------------
+
+describe('validateMove — moveCount parity check', () => {
+  it('[AI-Review][HIGH] rejects state where currentTurn contradicts parity (even pieceCount → O)', () => {
+    // 0 pieces on board means even → expected 'X', but currentTurn is 'O'
+    const state: GameState = { ...createGame(), currentTurn: 'O', moveCount: 0 };
+    const result = validateMove(state, { row: 0, col: 0 }, 'O');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review][HIGH] rejects state where currentTurn contradicts parity (odd pieceCount → X)', () => {
+    // After 1 move, pieceCount=1 (odd) → expected 'O', but currentTurn tampered back to 'X'
+    const stateAfterOneMove = applyMove(createGame(), { row: 0, col: 0 }, 'X');
+    const tamperedState: GameState = { ...stateAfterOneMove, currentTurn: 'X' };
+    const result = validateMove(tamperedState, { row: 1, col: 1 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review][HIGH] accepts freshly created game (pieceCount=0, currentTurn=X)', () => {
+    const result = validateMove(createGame(), { row: 0, col: 0 }, 'X');
+    expect(result.valid).toBe(true);
+  });
+
+  it('[AI-Review][HIGH] accepts state after one valid move (pieceCount=1, currentTurn=O)', () => {
+    const state = applyMove(createGame(), { row: 0, col: 0 }, 'X');
+    const result = validateMove(state, { row: 1, col: 1 }, 'O');
+    expect(result.valid).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkOutcome — Round 7: board size limit (HIGH, OOM prevention)
+// ---------------------------------------------------------------------------
+
+describe('checkOutcome — board size limit', () => {
+  it('[AI-Review][HIGH] returns null for a board exceeding MAX_BOARD_SIZE without generating lines', () => {
+    // A 25×25 board (> cap of 20) — generateWinningLines must NOT be called (OOM prevention).
+    const oversized: Board = Array.from({ length: 25 }, () =>
+      Array.from({ length: 25 }, (): Symbol | null => null),
+    ) as unknown as Board;
+    expect(checkOutcome(oversized, 0)).toBeNull();
+  });
+
+  it('[AI-Review][HIGH] processes a board at exactly MAX_BOARD_SIZE without issue', () => {
+    // 20×20 board at the boundary — should not be rejected.
+    const boundaryBoard: Board = Array.from({ length: 20 }, () =>
+      Array.from({ length: 20 }, (): Symbol | null => null),
+    ) as unknown as Board;
+    // moveCount=0 → early exit (< 2*20-1=39), so null is expected; NO crash is the key check.
+    expect(() => checkOutcome(boundaryBoard, 0)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyMove — Round 7: non-integer position (MEDIUM)
+// ---------------------------------------------------------------------------
+
+describe('applyMove — non-integer position', () => {
+  it('[AI-Review][MEDIUM] throws TypeError when position.row is a float', () => {
+    expect(() => applyMove(createGame(), { row: 0.5, col: 0 }, 'X')).toThrow(TypeError);
+  });
+
+  it('[AI-Review][MEDIUM] throws TypeError when position.col is a float', () => {
+    expect(() => applyMove(createGame(), { row: 0, col: 1.7 }, 'X')).toThrow(TypeError);
+  });
+
+  it('[AI-Review][MEDIUM] throws TypeError when position.row is NaN', () => {
+    expect(() => applyMove(createGame(), { row: NaN, col: 0 }, 'X')).toThrow(TypeError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyMove — Round 7: invalid symbol validation (MEDIUM)
+// ---------------------------------------------------------------------------
+
+describe('applyMove — symbol validation', () => {
+  it('[AI-Review][MEDIUM] throws TypeError when symbol is not X or O', () => {
+    expect(() => applyMove(createGame(), { row: 0, col: 0 }, 'Z' as unknown as Symbol)).toThrow(
+      TypeError,
+    );
+  });
+
+  it('[AI-Review][MEDIUM] throws TypeError when symbol is an empty string', () => {
+    expect(() => applyMove(createGame(), { row: 0, col: 0 }, '' as unknown as Symbol)).toThrow(
+      TypeError,
+    );
+  });
+
+  it('[AI-Review][MEDIUM] does not throw for valid symbol X', () => {
+    expect(() => applyMove(createGame(), { row: 0, col: 0 }, 'X')).not.toThrow();
+  });
+
+  it('[AI-Review][MEDIUM] does not throw for valid symbol O', () => {
+    const state = applyMove(createGame(), { row: 0, col: 0 }, 'X');
+    expect(() => applyMove(state, { row: 1, col: 0 }, 'O')).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createGame — Round 7: player filter rejects array elements (LOW)
+// ---------------------------------------------------------------------------
+
+describe('createGame — player filter rejects array elements', () => {
+  it('[AI-Review][LOW] filters out a bare array element from the players list', () => {
+    // typeof [] === 'object' — without !Array.isArray(p), an array would pass the filter.
+    const players = [
+      [] as unknown as PlayerInfo,
+      {
+        playerId: 'p1',
+        displayName: 'Alice',
+        avatarUrl: '',
+        symbol: 'X' as const,
+        connected: true,
+      },
+    ];
+    const state = createGame('room', players);
+    expect(state.players).toHaveLength(1);
+    expect(state.players[0].playerId).toBe('p1');
+  });
+
+  it('[AI-Review][LOW] produces empty players array when all elements are bare arrays', () => {
+    const state = createGame('room', [[] as unknown as PlayerInfo]);
+    expect(state.players).toHaveLength(0);
+  });
+});

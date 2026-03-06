@@ -47,7 +47,7 @@ export function createGame(roomId = '', players: PlayerInfo[] = []): GameState {
     Array.from({ length: BOARD_SIZE }, (): Symbol | null => null),
   );
   const currentPlayers = (Array.isArray(players) ? players : [])
-    .filter((p): p is PlayerInfo => p != null && typeof p === 'object')
+    .filter((p): p is PlayerInfo => p != null && typeof p === 'object' && !Array.isArray(p))
     .map((p) => ({
       playerId: p.playerId,
       displayName: p.displayName,
@@ -145,6 +145,16 @@ export function validateMove(
     };
   }
 
+  // moveCount parity: X plays on even move indices (0, 2, 4…), O on odd (1, 3, 5…)
+  const expectedTurn = actualPieceCount % 2 === 0 ? 'X' : 'O';
+  if (state.currentTurn !== expectedTurn) {
+    return {
+      valid: false,
+      code: 'INVALID_STATE',
+      message: `currentTurn is inconsistent with moveCount parity: expected '${expectedTurn}' for pieceCount ${actualPieceCount}, got '${state.currentTurn}'.`,
+    };
+  }
+
   if (position == null || typeof position !== 'object') {
     return {
       valid: false,
@@ -223,13 +233,25 @@ export function validateMove(
  * Checks for win/draw and updates phase + outcome accordingly.
  */
 export function applyMove(state: GameState, position: Position, symbol: Symbol): GameState {
+  if (state == null || typeof state !== 'object') {
+    throw new TypeError('applyMove: state must be a valid object.');
+  }
+
   if (position == null || typeof position !== 'object') {
     throw new TypeError('applyMove: position must be a valid object.');
   }
 
   const { row, col } = position;
 
-  if (!Array.isArray(state?.board)) {
+  if (!Number.isInteger(row) || !Number.isInteger(col)) {
+    throw new TypeError('applyMove: position.row and position.col must be integers.');
+  }
+
+  if (symbol !== 'X' && symbol !== 'O') {
+    throw new TypeError(`applyMove: symbol must be 'X' or 'O', got '${String(symbol)}'.`);
+  }
+
+  if (!Array.isArray(state.board)) {
     throw new TypeError('applyMove: state.board must be a valid array');
   }
 
@@ -251,7 +273,7 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
   const newMoveCount = state.moveCount + 1;
   const outcome = checkOutcome(newBoard, newMoveCount);
   const players = (Array.isArray(state.players) ? state.players : [])
-    .filter((p): p is PlayerInfo => p != null && typeof p === 'object')
+    .filter((p): p is PlayerInfo => p != null && typeof p === 'object' && !Array.isArray(p))
     .map((p) => ({
       playerId: p.playerId,
       displayName: p.displayName,
@@ -281,10 +303,14 @@ export function checkOutcome(board: Board, moveCount: number): GameOutcome | nul
   if (!Array.isArray(board)) return null;
 
   const size = board.length;
+  // Reject oversized boards — prevents OOM in generateWinningLines from untrusted input.
+  if (size > MAX_BOARD_SIZE) return null;
   // A win requires at least (2*size - 1) moves: size for one player, size-1 for the other.
   if (moveCount < 2 * size - 1) return null;
 
   for (const line of generateWinningLines(size)) {
+    // Skip degenerate lines (e.g. 0×0 board — generateWinningLines(0) returns two empty arrays)
+    if (line.length === 0) continue;
     // Guard against undefined/null rows — accessing [col] on a non-array would throw
     if (!Array.isArray(board[line[0].row])) continue;
     const first = board[line[0].row][line[0].col];
