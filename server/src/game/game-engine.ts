@@ -30,7 +30,7 @@ export function createGame(roomId = '', players: PlayerInfo[] = []): GameState {
     roomId,
     board,
     currentTurn: 'X',
-    players: [...players],
+    players: players.map((p) => ({ ...p })),
     phase: 'playing',
     outcome: null,
     moveCount: 0,
@@ -51,6 +51,22 @@ export function validateMove(
   position: Position,
   symbol: Symbol,
 ): MoveValidationResult {
+  if (position == null || typeof position !== 'object') {
+    return {
+      valid: false,
+      code: 'INVALID_POSITION',
+      message: 'Position must be a valid object.',
+    };
+  }
+
+  if (symbol !== 'X' && symbol !== 'O') {
+    return {
+      valid: false,
+      code: 'INVALID_SYMBOL',
+      message: `Symbol must be 'X' or 'O', got '${String(symbol)}'.`,
+    };
+  }
+
   const { row, col } = position;
 
   if (!Number.isInteger(row) || !Number.isInteger(col)) {
@@ -118,6 +134,9 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
  * Returns the GameOutcome if finished, or null if still in progress.
  */
 export function checkOutcome(board: Board, moveCount: number): GameOutcome | null {
+  // A win requires at least 5 moves (3 for one player, 2 for the other).
+  if (moveCount < 5) return null;
+
   for (const line of WINNING_LINES) {
     const [a, b, c] = line;
     const cellA = board[a.row][a.col];

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, validateMove, applyMove, checkOutcome } from './game-engine.js';
 import { BOARD_SIZE } from 'shared';
+import type { Board, Position, PlayerInfo, Symbol } from 'shared';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -56,7 +57,7 @@ describe('createGame', () => {
   });
 
   it('[AI-Review] clones the players array — mutating original does not affect state', () => {
-    const players = [
+    const players: PlayerInfo[] = [
       {
         playerId: 'p1',
         displayName: 'Alice',
@@ -74,6 +75,21 @@ describe('createGame', () => {
       connected: true,
     });
     expect(state.players).toHaveLength(1);
+  });
+
+  it('[AI-Review] deep-clones player objects — mutating a player in original array does not affect state', () => {
+    const players = [
+      {
+        playerId: 'p1',
+        displayName: 'Alice',
+        avatarUrl: '',
+        symbol: 'X' as const,
+        connected: true,
+      },
+    ];
+    const state = createGame('room-1', players);
+    players[0].displayName = 'Mutated';
+    expect(state.players[0].displayName).toBe('Alice');
   });
 });
 
@@ -134,6 +150,24 @@ describe('validateMove', () => {
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.code).toBe('INVALID_POSITION');
   });
+
+  it('[AI-Review] rejects null position with INVALID_POSITION', () => {
+    const result = validateMove(createGame(), null as unknown as Position, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_POSITION');
+  });
+
+  it('[AI-Review] rejects undefined position with INVALID_POSITION', () => {
+    const result = validateMove(createGame(), undefined as unknown as Position, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_POSITION');
+  });
+
+  it('[AI-Review] rejects invalid symbol with INVALID_SYMBOL', () => {
+    const result = validateMove(createGame(), { row: 0, col: 0 }, 'Z' as unknown as Symbol);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_SYMBOL');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -165,7 +199,7 @@ describe('applyMove', () => {
   });
 
   it('[AI-Review] preserves unchanged state properties (roomId, players)', () => {
-    const players = [
+    const players: PlayerInfo[] = [
       {
         playerId: 'p1',
         displayName: 'Alice',
@@ -423,5 +457,16 @@ describe('checkOutcome — in progress', () => {
       [1, 1],
     ]);
     expect(checkOutcome(state.board, state.moveCount)).toBeNull();
+  });
+
+  it('[AI-Review] skips win evaluation and returns null when moveCount < 5', () => {
+    // Artificially construct a board with a completed row but moveCount = 4
+    // (impossible in a real game, but verifies the early-exit guard).
+    const board = [
+      ['X', 'X', 'X'],
+      [null, null, null],
+      [null, null, null],
+    ] as Board;
+    expect(checkOutcome(board, 4)).toBeNull();
   });
 });
