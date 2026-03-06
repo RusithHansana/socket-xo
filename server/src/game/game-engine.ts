@@ -1,13 +1,20 @@
 import type { GameState, Board, Symbol, Position, GameOutcome, PlayerInfo } from 'shared';
 import { BOARD_SIZE } from 'shared';
 
+/** Memoization cache: avoids re-allocating winning lines on every checkOutcome call. */
+const winningLinesCache = new Map<number, Position[][]>();
+
 /**
  * Generate all winning lines (rows, columns, diagonals) for an n×n board.
  * NOTE: Each line spans the full board width (n-cells-in-a-row win condition).
  * Correct for standard Tic-Tac-Toe (3×3) but does not support m-n-k games
  * where the win condition k differs from the board size n.
+ * Results are memoized by board size to avoid repeated allocation on every move.
  */
 function generateWinningLines(size: number): Position[][] {
+  if (winningLinesCache.has(size)) {
+    return winningLinesCache.get(size)!;
+  }
   const lines: Position[][] = [];
   for (let r = 0; r < size; r++) {
     lines.push(Array.from({ length: size }, (_, c) => ({ row: r, col: c })));
@@ -17,6 +24,7 @@ function generateWinningLines(size: number): Position[][] {
   }
   lines.push(Array.from({ length: size }, (_, i) => ({ row: i, col: i })));
   lines.push(Array.from({ length: size }, (_, i) => ({ row: i, col: size - 1 - i })));
+  winningLinesCache.set(size, lines);
   return lines;
 }
 
@@ -65,6 +73,14 @@ export function validateMove(
     };
   }
 
+  if (!Number.isInteger(state.moveCount) || state.moveCount < 0) {
+    return {
+      valid: false,
+      code: 'INVALID_STATE',
+      message: 'Game state moveCount must be a non-negative integer.',
+    };
+  }
+
   if (position == null || typeof position !== 'object') {
     return {
       valid: false,
@@ -102,6 +118,15 @@ export function validateMove(
 
   // Guard against jagged/sparse board rows — prevents process crash when board[row] is not an array
   if (!Array.isArray(state.board[row])) {
+    return {
+      valid: false,
+      code: 'INVALID_POSITION',
+      message: `Position (${row}, ${col}) is out of bounds.`,
+    };
+  }
+
+  // Guard col within the actual row length — handles jagged boards where a row is shorter
+  if (col >= state.board[row].length) {
     return {
       valid: false,
       code: 'INVALID_POSITION',
@@ -150,7 +175,7 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
     currentTurn: state.currentTurn === 'X' ? 'O' : 'X',
     phase: outcome !== null ? 'finished' : 'playing',
     outcome,
-    players: state.players.map((p) => ({ ...p })),
+    players: (Array.isArray(state.players) ? state.players : []).map((p) => ({ ...p })),
   };
 }
 

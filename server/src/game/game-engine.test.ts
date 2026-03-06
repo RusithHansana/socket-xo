@@ -204,6 +204,31 @@ describe('validateMove', () => {
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.code).toBe('INVALID_POSITION');
   });
+
+  it('[AI-Review] rejects move when row exists but is shorter than col index (jagged cols)', () => {
+    // row 0 has only 1 cell — col=1 is in-bounds for the 3-row board but out-of-bounds for this row
+    const state: GameState = {
+      ...createGame(),
+      board: [[null], [null, null, null], [null, null, null]] as unknown as Board,
+    };
+    const result = validateMove(state, { row: 0, col: 1 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_POSITION');
+  });
+
+  it('[AI-Review] rejects state with non-integer moveCount with INVALID_STATE', () => {
+    const state = { ...createGame(), moveCount: 1.5 };
+    const result = validateMove(state as unknown as GameState, { row: 0, col: 0 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review] rejects state with negative moveCount with INVALID_STATE', () => {
+    const state = { ...createGame(), moveCount: -1 };
+    const result = validateMove(state as unknown as GameState, { row: 0, col: 0 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -274,6 +299,14 @@ describe('applyMove', () => {
     original.board.forEach((row, r) => row.forEach((cell, c) => expect(cell).toBe(snapshot[r][c])));
     expect(original.currentTurn).toBe('X');
     expect(original.moveCount).toBe(0);
+  });
+
+  it('[AI-Review] does not crash when state.players is not an array', () => {
+    const state = { ...createGame(), players: null };
+    expect(() => applyMove(state as unknown as GameState, { row: 0, col: 0 }, 'X')).not.toThrow();
+    const next = applyMove(state as unknown as GameState, { row: 0, col: 0 }, 'X');
+    expect(Array.isArray(next.players)).toBe(true);
+    expect(next.players).toEqual([]);
   });
 });
 
