@@ -3,6 +3,8 @@ import { BOARD_SIZE } from 'shared';
 
 /** Memoization cache: avoids re-allocating winning lines on every checkOutcome call. */
 const winningLinesCache = new Map<number, Position[][]>();
+/** Upper bound on cached board sizes — prevents unbounded memory growth from arbitrary input. */
+const MAX_WINNING_LINES_CACHE_SIZE = 20;
 
 /**
  * Generate all winning lines (rows, columns, diagonals) for an n×n board.
@@ -24,20 +26,26 @@ function generateWinningLines(size: number): Position[][] {
   }
   lines.push(Array.from({ length: size }, (_, i) => ({ row: i, col: i })));
   lines.push(Array.from({ length: size }, (_, i) => ({ row: i, col: size - 1 - i })));
-  winningLinesCache.set(size, lines);
+  if (winningLinesCache.size < MAX_WINNING_LINES_CACHE_SIZE) {
+    winningLinesCache.set(size, lines);
+  }
   return lines;
 }
+
+/** Maximum allowed length for roomId to prevent storing arbitrarily large strings. */
+const MAX_ROOM_ID_LENGTH = 256;
 
 /**
  * Creates a fresh game state with an empty board.
  * X always goes first.
  */
 export function createGame(roomId = '', players: PlayerInfo[] = []): GameState {
+  const safeRoomId = typeof roomId === 'string' ? roomId.slice(0, MAX_ROOM_ID_LENGTH) : '';
   const board: Board = Array.from({ length: BOARD_SIZE }, () =>
     Array.from({ length: BOARD_SIZE }, (): Symbol | null => null),
   );
   return {
-    roomId,
+    roomId: safeRoomId,
     board,
     currentTurn: 'X',
     players: (Array.isArray(players) ? players : []).map((p) => ({ ...p })),
@@ -78,6 +86,24 @@ export function validateMove(
       valid: false,
       code: 'INVALID_STATE',
       message: 'Game state moveCount must be a non-negative integer.',
+    };
+  }
+
+  // Verify moveCount matches actual number of pieces placed on the board.
+  // Detects corrupted or tampered state where the counter is out of sync.
+  let actualPieceCount = 0;
+  for (const boardRow of state.board) {
+    if (Array.isArray(boardRow)) {
+      for (const cell of boardRow) {
+        if (cell === 'X' || cell === 'O') actualPieceCount++;
+      }
+    }
+  }
+  if (state.moveCount !== actualPieceCount) {
+    return {
+      valid: false,
+      code: 'INVALID_STATE',
+      message: `moveCount (${state.moveCount}) does not match actual pieces on the board (${actualPieceCount}).`,
     };
   }
 
@@ -165,9 +191,12 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
     throw new TypeError('applyMove: state.board must be a valid array');
   }
 
-  const newBoard: Board = state.board.map((r, rIdx) =>
-    r.map((cell, cIdx) => (rIdx === row && cIdx === col ? symbol : cell)),
-  );
+  const newBoard: Board = state.board.map((r, rIdx) => {
+    if (!Array.isArray(r)) {
+      throw new TypeError(`applyMove: state.board[${rIdx}] must be a valid array`);
+    }
+    return r.map((cell, cIdx) => (rIdx === row && cIdx === col ? symbol : cell));
+  });
 
   const newMoveCount = state.moveCount + 1;
   const outcome = checkOutcome(newBoard, newMoveCount);
@@ -197,9 +226,14 @@ export function checkOutcome(board: Board, moveCount: number): GameOutcome | nul
   if (moveCount < 2 * size - 1) return null;
 
   for (const line of generateWinningLines(size)) {
+    // Guard against undefined/null rows — accessing [col] on a non-array would throw
+    if (!Array.isArray(board[line[0].row])) continue;
     const first = board[line[0].row][line[0].col];
     // Guard against undefined cells — `undefined === undefined` would be a false-positive win
-    if ((first === 'X' || first === 'O') && line.every((p) => board[p.row][p.col] === first)) {
+    if (
+      (first === 'X' || first === 'O') &&
+      line.every((p) => Array.isArray(board[p.row]) && board[p.row][p.col] === first)
+    ) {
       return { type: 'win', winner: first, winningLine: line.map((p) => ({ ...p })) };
     }
   }

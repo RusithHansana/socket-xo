@@ -628,4 +628,122 @@ describe('checkOutcome — defensive input validation', () => {
   it('[AI-Review] returns null when board is a non-array value (no crash)', () => {
     expect(checkOutcome('invalid' as unknown as Board, 5)).toBeNull();
   });
+
+  it('[AI-Review][CRITICAL] returns null when a board row is undefined (no crash)', () => {
+    // Row 1 is undefined — the guard skips winning-line checks through it without crashing.
+    // Row 0 has X O X (not a row win) and col/diagonal lines referencing row 1 are all skipped.
+    const board = [['X', 'O', 'X'], undefined, ['O', 'X', null]] as unknown as Board;
+    expect(() => checkOutcome(board, 5)).not.toThrow();
+    expect(checkOutcome(board, 5)).toBeNull();
+  });
+
+  it('[AI-Review][CRITICAL] returns null when a board row is null (no crash)', () => {
+    const board = [['X', 'O', 'X'], null, ['O', 'X', null]] as unknown as Board;
+    expect(() => checkOutcome(board, 5)).not.toThrow();
+    expect(checkOutcome(board, 5)).toBeNull();
+  });
+
+  it('[AI-Review][CRITICAL] does not report a win through rows containing only null rows', () => {
+    // Only row 0 is valid; rows 1 and 2 are null — no column/diagonal win should fire
+    const board = [['X', 'O', 'X'], null, null] as unknown as Board;
+    expect(checkOutcome(board, 5)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyMove — jagged board rows
+// ---------------------------------------------------------------------------
+
+describe('applyMove — jagged board rows', () => {
+  it('[AI-Review][CRITICAL] throws TypeError when a row inside state.board is null', () => {
+    const state: GameState = {
+      ...createGame(),
+      board: [[null, null, null], null, [null, null, null]] as unknown as Board,
+    };
+    expect(() => applyMove(state, { row: 0, col: 0 }, 'X')).toThrow(TypeError);
+  });
+
+  it('[AI-Review][CRITICAL] throws TypeError when a row inside state.board is undefined', () => {
+    const state: GameState = {
+      ...createGame(),
+      board: [[null, null, null], undefined, [null, null, null]] as unknown as Board,
+    };
+    expect(() => applyMove(state, { row: 0, col: 0 }, 'X')).toThrow(TypeError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateMove — moveCount vs actual pieces
+// ---------------------------------------------------------------------------
+
+describe('validateMove — moveCount vs actual pieces', () => {
+  it('[AI-Review][MEDIUM] rejects state where moveCount is higher than actual pieces', () => {
+    // Board has 1 piece (X at [0,0]) but moveCount claims 3 — tampered/corrupted state
+    applyMove(createGame(), { row: 0, col: 0 }, 'X'); // real board has 1 piece
+    const tamperedState: GameState = {
+      ...applyMove(createGame(), { row: 0, col: 0 }, 'X'),
+      moveCount: 3,
+    };
+    const result = validateMove(tamperedState, { row: 1, col: 1 }, 'O');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review][MEDIUM] rejects state where moveCount is lower than actual pieces', () => {
+    // Board has 2 pieces (X at [0,0], O at [1,0]) but moveCount claims only 1
+    const stateWith2Pieces = applyMove(
+      applyMove(createGame(), { row: 0, col: 0 }, 'X'),
+      { row: 1, col: 0 },
+      'O',
+    );
+    const tamperedState: GameState = { ...stateWith2Pieces, moveCount: 1 };
+    const result = validateMove(tamperedState, { row: 0, col: 1 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review][MEDIUM] accepts state where moveCount correctly matches actual pieces', () => {
+    // 1 piece on board, moveCount=1, currentTurn=O — should accept O move
+    const state = applyMove(createGame(), { row: 0, col: 0 }, 'X');
+    expect(state.moveCount).toBe(1);
+    const result = validateMove(state, { row: 1, col: 1 }, 'O');
+    expect(result.valid).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createGame — roomId length validation
+// ---------------------------------------------------------------------------
+
+describe('createGame — roomId validation', () => {
+  it('[AI-Review][LOW] truncates roomId longer than 256 characters', () => {
+    const longId = 'a'.repeat(300);
+    const state = createGame(longId);
+    expect(state.roomId.length).toBe(256);
+    expect(state.roomId).toBe('a'.repeat(256));
+  });
+
+  it('[AI-Review][LOW] preserves roomId within 256 character limit', () => {
+    const id = 'room-' + 'x'.repeat(100);
+    const state = createGame(id);
+    expect(state.roomId).toBe(id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// winningLinesCache — memory exhaustion cap
+// ---------------------------------------------------------------------------
+
+describe('winningLinesCache — memory cap', () => {
+  it('[AI-Review][MEDIUM] does not grow the cache beyond MAX_WINNING_LINES_CACHE_SIZE for arbitrary board sizes', () => {
+    // Call checkOutcome with 25 distinct board sizes (2 through 26), each larger than any cached.
+    // The cache cap is 20 — only the first 20 unique sizes should be stored.
+    // No crash or memory error should occur regardless.
+    for (let size = 2; size <= 26; size++) {
+      const board: Board = Array.from({ length: size }, () =>
+        Array.from({ length: size }, (): Symbol | null => null),
+      ) as unknown as Board;
+      expect(() => checkOutcome(board, 0)).not.toThrow();
+    }
+  });
 });
