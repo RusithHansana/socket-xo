@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, validateMove, applyMove, checkOutcome } from './game-engine.js';
 import { BOARD_SIZE } from 'shared';
-import type { Board, Position, PlayerInfo, Symbol } from 'shared';
+import type { Board, Position, PlayerInfo, Symbol, GameState } from 'shared';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -168,6 +168,24 @@ describe('validateMove', () => {
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.code).toBe('INVALID_SYMBOL');
   });
+
+  it('[AI-Review] rejects null state with INVALID_STATE', () => {
+    const result = validateMove(null as unknown as GameState, { row: 0, col: 0 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review] rejects undefined state with INVALID_STATE', () => {
+    const result = validateMove(undefined as unknown as GameState, { row: 0, col: 0 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review] rejects state without board property with INVALID_STATE', () => {
+    const result = validateMove({} as unknown as GameState, { row: 0, col: 0 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -213,6 +231,22 @@ describe('applyMove', () => {
     const next = applyMove(state, { row: 0, col: 0 }, 'X');
     expect(next.roomId).toBe('room-42');
     expect(next.players).toStrictEqual(players);
+  });
+
+  it('[AI-Review] deep-clones players — mutating returned state players does not affect original', () => {
+    const players: PlayerInfo[] = [
+      {
+        playerId: 'p1',
+        displayName: 'Alice',
+        avatarUrl: '',
+        symbol: 'X' as const,
+        connected: true,
+      },
+    ];
+    const state = createGame('room-1', players);
+    const next = applyMove(state, { row: 0, col: 0 }, 'X');
+    next.players[0].displayName = 'Mutated';
+    expect(state.players[0].displayName).toBe('Alice');
   });
 
   it('6.12 — does not mutate the original state (board immutability)', () => {

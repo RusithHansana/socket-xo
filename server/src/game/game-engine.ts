@@ -1,7 +1,12 @@
 import type { GameState, Board, Symbol, Position, GameOutcome, PlayerInfo } from 'shared';
 import { BOARD_SIZE } from 'shared';
 
-/** Generate all winning lines (rows, columns, diagonals) for an n×n board. */
+/**
+ * Generate all winning lines (rows, columns, diagonals) for an n×n board.
+ * NOTE: Each line spans the full board width (n-cells-in-a-row win condition).
+ * Correct for standard Tic-Tac-Toe (3×3) but does not support m-n-k games
+ * where the win condition k differs from the board size n.
+ */
 function generateWinningLines(size: number): Position[][] {
   const lines: Position[][] = [];
   for (let r = 0; r < size; r++) {
@@ -51,6 +56,18 @@ export function validateMove(
   position: Position,
   symbol: Symbol,
 ): MoveValidationResult {
+  // Guard against invalid state object (defensive runtime validation)
+  if (state == null || typeof state !== 'object') {
+    return { valid: false, code: 'INVALID_STATE', message: 'Game state must be a valid object.' };
+  }
+  if (!Array.isArray(state.board)) {
+    return {
+      valid: false,
+      code: 'INVALID_STATE',
+      message: 'Game state must have a valid board array.',
+    };
+  }
+
   if (position == null || typeof position !== 'object') {
     return {
       valid: false,
@@ -77,7 +94,8 @@ export function validateMove(
     };
   }
 
-  if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
+  const boardSize = state.board.length;
+  if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
     return {
       valid: false,
       code: 'INVALID_POSITION',
@@ -126,6 +144,7 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
     currentTurn: state.currentTurn === 'X' ? 'O' : 'X',
     phase: outcome !== null ? 'finished' : 'playing',
     outcome,
+    players: state.players.map((p) => ({ ...p })),
   };
 }
 
@@ -138,10 +157,9 @@ export function checkOutcome(board: Board, moveCount: number): GameOutcome | nul
   if (moveCount < 5) return null;
 
   for (const line of WINNING_LINES) {
-    const [a, b, c] = line;
-    const cellA = board[a.row][a.col];
-    if (cellA !== null && cellA === board[b.row][b.col] && cellA === board[c.row][c.col]) {
-      return { type: 'win', winner: cellA, winningLine: line.map((p) => ({ ...p })) };
+    const first = board[line[0].row][line[0].col];
+    if (first !== null && line.every((p) => board[p.row][p.col] === first)) {
+      return { type: 'win', winner: first, winningLine: line.map((p) => ({ ...p })) };
     }
   }
 
