@@ -46,11 +46,20 @@ export function createGame(roomId = '', players: PlayerInfo[] = []): GameState {
   const board: Board = Array.from({ length: BOARD_SIZE }, () =>
     Array.from({ length: BOARD_SIZE }, (): Symbol | null => null),
   );
+  const currentPlayers = (Array.isArray(players) ? players : [])
+    .filter((p): p is PlayerInfo => p != null && typeof p === 'object')
+    .map((p) => ({
+      playerId: p.playerId,
+      displayName: p.displayName,
+      avatarUrl: p.avatarUrl,
+      symbol: p.symbol,
+      connected: p.connected,
+    }));
   return {
     roomId: safeRoomId,
     board,
     currentTurn: 'X',
-    players: (Array.isArray(players) ? players : []).map((p) => ({ ...p })),
+    players: currentPlayers,
     phase: 'playing',
     outcome: null,
     moveCount: 0,
@@ -102,11 +111,20 @@ export function validateMove(
 
   // Verify moveCount matches actual number of pieces placed on the board.
   // Detects corrupted or tampered state where the counter is out of sync.
+  // Also rejects any cell value that is not 'X', 'O', or null (corrupted board).
   let actualPieceCount = 0;
   for (const boardRow of state.board) {
     if (Array.isArray(boardRow)) {
       for (const cell of boardRow) {
-        if (cell === 'X' || cell === 'O') actualPieceCount++;
+        if (cell === 'X' || cell === 'O') {
+          actualPieceCount++;
+        } else if (cell !== null) {
+          return {
+            valid: false,
+            code: 'INVALID_STATE',
+            message: 'Board contains an invalid cell value.',
+          };
+        }
       }
     }
   }
@@ -115,6 +133,15 @@ export function validateMove(
       valid: false,
       code: 'INVALID_STATE',
       message: `moveCount (${state.moveCount}) does not match actual pieces on the board (${actualPieceCount}).`,
+    };
+  }
+
+  // Validate currentTurn is a legitimate symbol before any turn comparison.
+  if (state.currentTurn !== 'X' && state.currentTurn !== 'O') {
+    return {
+      valid: false,
+      code: 'INVALID_STATE',
+      message: `currentTurn must be 'X' or 'O', got '${String(state.currentTurn)}'.`,
     };
   }
 
@@ -196,6 +223,10 @@ export function validateMove(
  * Checks for win/draw and updates phase + outcome accordingly.
  */
 export function applyMove(state: GameState, position: Position, symbol: Symbol): GameState {
+  if (position == null || typeof position !== 'object') {
+    throw new TypeError('applyMove: position must be a valid object.');
+  }
+
   const { row, col } = position;
 
   if (!Array.isArray(state?.board)) {
@@ -219,6 +250,15 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
 
   const newMoveCount = state.moveCount + 1;
   const outcome = checkOutcome(newBoard, newMoveCount);
+  const players = (Array.isArray(state.players) ? state.players : [])
+    .filter((p): p is PlayerInfo => p != null && typeof p === 'object')
+    .map((p) => ({
+      playerId: p.playerId,
+      displayName: p.displayName,
+      avatarUrl: p.avatarUrl,
+      symbol: p.symbol,
+      connected: p.connected,
+    }));
 
   // Explicitly enumerate all GameState properties — prevents arbitrary
   // payload properties from persisting into the returned state object.
@@ -226,13 +266,7 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
     roomId: typeof state.roomId === 'string' ? state.roomId.slice(0, MAX_ROOM_ID_LENGTH) : '',
     board: newBoard,
     currentTurn: state.currentTurn === 'X' ? 'O' : 'X',
-    players: (Array.isArray(state.players) ? state.players : []).map((p) => ({
-      playerId: p.playerId,
-      displayName: p.displayName,
-      avatarUrl: p.avatarUrl,
-      symbol: p.symbol,
-      connected: p.connected,
-    })),
+    players: players,
     phase: outcome !== null ? 'finished' : 'playing',
     outcome,
     moveCount: newMoveCount,

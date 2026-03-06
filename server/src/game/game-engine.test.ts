@@ -913,3 +913,122 @@ describe('applyMove — phase assertion', () => {
     expect(() => applyMove(createGame(), { row: 0, col: 0 }, 'X')).not.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// applyMove — null/undefined elements in players array
+// ---------------------------------------------------------------------------
+
+describe('applyMove — null/undefined player elements', () => {
+  it('[AI-Review][CRITICAL] filters out null player elements without crashing', () => {
+    const state: GameState = {
+      ...createGame(),
+      players: [null] as unknown as PlayerInfo[],
+    };
+    expect(() => applyMove(state, { row: 0, col: 0 }, 'X')).not.toThrow();
+    const next = applyMove(state, { row: 0, col: 0 }, 'X');
+    expect(Array.isArray(next.players)).toBe(true);
+    expect(next.players).toHaveLength(0);
+  });
+
+  it('[AI-Review][CRITICAL] filters out undefined player elements without crashing', () => {
+    const state: GameState = {
+      ...createGame(),
+      players: [undefined] as unknown as PlayerInfo[],
+    };
+    expect(() => applyMove(state, { row: 0, col: 0 }, 'X')).not.toThrow();
+    const next = applyMove(state, { row: 0, col: 0 }, 'X');
+    expect(Array.isArray(next.players)).toBe(true);
+    expect(next.players).toHaveLength(0);
+  });
+
+  it('[AI-Review][CRITICAL] keeps valid player elements while filtering null/undefined', () => {
+    const validPlayer: PlayerInfo = {
+      playerId: 'p1',
+      displayName: 'Alice',
+      avatarUrl: '',
+      symbol: 'X' as const,
+      connected: true,
+    };
+    const state: GameState = {
+      ...createGame('room-1', [validPlayer]),
+      players: [validPlayer, null, undefined] as unknown as PlayerInfo[],
+    };
+    const next = applyMove(state, { row: 0, col: 0 }, 'X');
+    expect(next.players).toHaveLength(1);
+    expect(next.players[0].playerId).toBe('p1');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateMove — corrupted board cells
+// ---------------------------------------------------------------------------
+
+describe('validateMove — corrupted board cells', () => {
+  it('[AI-Review][MEDIUM] rejects board containing an invalid string cell with INVALID_STATE', () => {
+    const boardWithInvalidCell: Board = [
+      ['invalid-string' as unknown as Symbol | null, null, null],
+      [null, null, null],
+      [null, null, null],
+    ];
+    const state: GameState = { ...createGame(), board: boardWithInvalidCell, moveCount: 0 };
+    const result = validateMove(state, { row: 1, col: 1 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review][MEDIUM] rejects board containing an object cell with INVALID_STATE', () => {
+    const boardWithObjCell: Board = [
+      [{} as unknown as Symbol | null, null, null],
+      [null, null, null],
+      [null, null, null],
+    ];
+    const state: GameState = { ...createGame(), board: boardWithObjCell, moveCount: 0 };
+    const result = validateMove(state, { row: 1, col: 1 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review][MEDIUM] rejects board containing a numeric cell with INVALID_STATE', () => {
+    const boardWithNumericCell: Board = [
+      [42 as unknown as Symbol | null, null, null],
+      [null, null, null],
+      [null, null, null],
+    ];
+    const state: GameState = { ...createGame(), board: boardWithNumericCell, moveCount: 0 };
+    const result = validateMove(state, { row: 1, col: 1 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateMove — currentTurn integrity
+// ---------------------------------------------------------------------------
+
+describe('validateMove — currentTurn integrity', () => {
+  it('[AI-Review][LOW] rejects state where currentTurn is null with INVALID_STATE', () => {
+    const state: GameState = { ...createGame(), currentTurn: null as unknown as Symbol };
+    const result = validateMove(state, { row: 0, col: 0 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review][LOW] rejects state where currentTurn is an invalid string with INVALID_STATE', () => {
+    const state: GameState = { ...createGame(), currentTurn: 'Z' as unknown as Symbol };
+    const result = validateMove(state, { row: 0, col: 0 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review][LOW] accepts state where currentTurn is "X"', () => {
+    const state = createGame(); // currentTurn = 'X'
+    const result = validateMove(state, { row: 0, col: 0 }, 'X');
+    expect(result.valid).toBe(true);
+  });
+
+  it('[AI-Review][LOW] accepts state where currentTurn is "O"', () => {
+    const state = applyMove(createGame(), { row: 0, col: 0 }, 'X'); // currentTurn = 'O'
+    const result = validateMove(state, { row: 1, col: 1 }, 'O');
+    expect(result.valid).toBe(true);
+  });
+});
