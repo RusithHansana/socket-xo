@@ -42,12 +42,25 @@ const MAX_ROOM_ID_LENGTH = 256;
  * X always goes first.
  */
 export function createGame(roomId = '', players: PlayerInfo[] = []): GameState {
-  const safeRoomId = typeof roomId === 'string' ? roomId.slice(0, MAX_ROOM_ID_LENGTH) : '';
+  if (typeof roomId !== 'string') {
+    throw new TypeError(`createGame: roomId must be a string, got ${typeof roomId}.`);
+  }
+  const safeRoomId = roomId.slice(0, MAX_ROOM_ID_LENGTH);
   const board: Board = Array.from({ length: BOARD_SIZE }, () =>
     Array.from({ length: BOARD_SIZE }, (): Symbol | null => null),
   );
   const currentPlayers = (Array.isArray(players) ? players : [])
-    .filter((p): p is PlayerInfo => p != null && typeof p === 'object' && !Array.isArray(p))
+    .filter(
+      (p): p is PlayerInfo =>
+        p != null &&
+        typeof p === 'object' &&
+        !Array.isArray(p) &&
+        typeof p.playerId === 'string' &&
+        typeof p.displayName === 'string' &&
+        typeof p.avatarUrl === 'string' &&
+        (p.symbol === 'X' || p.symbol === 'O') &&
+        typeof p.connected === 'boolean',
+    )
     .map((p) => ({
       playerId: p.playerId,
       displayName: p.displayName,
@@ -273,7 +286,17 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
   const newMoveCount = state.moveCount + 1;
   const outcome = checkOutcome(newBoard, newMoveCount);
   const players = (Array.isArray(state.players) ? state.players : [])
-    .filter((p): p is PlayerInfo => p != null && typeof p === 'object' && !Array.isArray(p))
+    .filter(
+      (p): p is PlayerInfo =>
+        p != null &&
+        typeof p === 'object' &&
+        !Array.isArray(p) &&
+        typeof p.playerId === 'string' &&
+        typeof p.displayName === 'string' &&
+        typeof p.avatarUrl === 'string' &&
+        (p.symbol === 'X' || p.symbol === 'O') &&
+        typeof p.connected === 'boolean',
+    )
     .map((p) => ({
       playerId: p.playerId,
       displayName: p.displayName,
@@ -304,7 +327,9 @@ export function checkOutcome(board: Board, moveCount: number): GameOutcome | nul
 
   const size = board.length;
   // Reject oversized boards — prevents OOM in generateWinningLines from untrusted input.
-  if (size > MAX_BOARD_SIZE) return null;
+  if (size > MAX_BOARD_SIZE) {
+    throw new Error(`checkOutcome: board size ${size} exceeds maximum allowed size ${MAX_BOARD_SIZE}.`);
+  }
   // A win requires at least (2*size - 1) moves: size for one player, size-1 for the other.
   if (moveCount < 2 * size - 1) return null;
 

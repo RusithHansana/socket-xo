@@ -97,6 +97,62 @@ describe('createGame', () => {
     expect(state.players).toEqual([]);
     expect(Array.isArray(state.players)).toBe(true);
   });
+
+  it('[AI-Review] throws TypeError when roomId is not a string', () => {
+    expect(() => createGame(123 as unknown as string)).toThrow(TypeError);
+  });
+
+  it('[AI-Review] filters out players with a non-string playerId', () => {
+    const invalid = [
+      { playerId: 99, displayName: 'Alice', avatarUrl: '', symbol: 'X' as const, connected: true },
+    ];
+    const state = createGame('room', invalid as unknown as PlayerInfo[]);
+    expect(state.players).toHaveLength(0);
+  });
+
+  it('[AI-Review] filters out players with an invalid symbol value', () => {
+    const invalid = [
+      {
+        playerId: 'p1',
+        displayName: 'Alice',
+        avatarUrl: '',
+        symbol: 'Q' as unknown as Symbol,
+        connected: true,
+      },
+    ];
+    const state = createGame('room', invalid as unknown as PlayerInfo[]);
+    expect(state.players).toHaveLength(0);
+  });
+
+  it('[AI-Review] filters out players with a non-boolean connected field', () => {
+    const invalid = [
+      {
+        playerId: 'p1',
+        displayName: 'Alice',
+        avatarUrl: '',
+        symbol: 'X' as const,
+        connected: 'yes',
+      },
+    ];
+    const state = createGame('room', invalid as unknown as PlayerInfo[]);
+    expect(state.players).toHaveLength(0);
+  });
+
+  it('[AI-Review] retains players where all fields are valid and rejects those that are not', () => {
+    const players = [
+      {
+        playerId: 'p1',
+        displayName: 'Alice',
+        avatarUrl: '',
+        symbol: 'X' as const,
+        connected: true,
+      },
+      { playerId: 42, displayName: 'Bob', avatarUrl: '', symbol: 'O' as const, connected: true },
+    ];
+    const state = createGame('room', players as unknown as PlayerInfo[]);
+    expect(state.players).toHaveLength(1);
+    expect(state.players[0].playerId).toBe('p1');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -735,16 +791,19 @@ describe('createGame — roomId validation', () => {
 // ---------------------------------------------------------------------------
 
 describe('winningLinesCache — memory cap', () => {
-  it('[AI-Review][MEDIUM] does not grow the cache beyond MAX_WINNING_LINES_CACHE_SIZE for arbitrary board sizes', () => {
-    // Call checkOutcome with 25 distinct board sizes (2 through 26), each larger than any cached.
-    // The cache cap is 20 — only the first 20 unique sizes should be stored.
-    // No crash or memory error should occur regardless.
-    for (let size = 2; size <= 26; size++) {
+  it('[AI-Review][MEDIUM] does not grow the cache beyond MAX_WINNING_LINES_CACHE_SIZE; throws for boards exceeding MAX_BOARD_SIZE', () => {
+    // Sizes 2–20: within the allowed range — must not throw and will fill the cache (capped at 20).
+    for (let size = 2; size <= 20; size++) {
       const board: Board = Array.from({ length: size }, () =>
         Array.from({ length: size }, (): Symbol | null => null),
       ) as unknown as Board;
       expect(() => checkOutcome(board, 0)).not.toThrow();
     }
+    // Sizes > 20: exceeds MAX_BOARD_SIZE — must throw to surface the programming error.
+    const oversizedBoard: Board = Array.from({ length: 21 }, () =>
+      Array.from({ length: 21 }, (): Symbol | null => null),
+    ) as unknown as Board;
+    expect(() => checkOutcome(oversizedBoard, 0)).toThrow(Error);
   });
 });
 
