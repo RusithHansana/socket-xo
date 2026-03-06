@@ -161,6 +161,10 @@ export function validateMove(
 export function applyMove(state: GameState, position: Position, symbol: Symbol): GameState {
   const { row, col } = position;
 
+  if (!Array.isArray(state?.board)) {
+    throw new TypeError('applyMove: state.board must be a valid array');
+  }
+
   const newBoard: Board = state.board.map((r, rIdx) =>
     r.map((cell, cIdx) => (rIdx === row && cIdx === col ? symbol : cell)),
   );
@@ -168,14 +172,16 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
   const newMoveCount = state.moveCount + 1;
   const outcome = checkOutcome(newBoard, newMoveCount);
 
+  // Explicitly enumerate all GameState properties — prevents arbitrary
+  // payload properties from persisting into the returned state object.
   return {
-    ...state,
+    roomId: state.roomId,
     board: newBoard,
-    moveCount: newMoveCount,
     currentTurn: state.currentTurn === 'X' ? 'O' : 'X',
+    players: (Array.isArray(state.players) ? state.players : []).map((p) => ({ ...p })),
     phase: outcome !== null ? 'finished' : 'playing',
     outcome,
-    players: (Array.isArray(state.players) ? state.players : []).map((p) => ({ ...p })),
+    moveCount: newMoveCount,
   };
 }
 
@@ -184,6 +190,8 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
  * Returns the GameOutcome if finished, or null if still in progress.
  */
 export function checkOutcome(board: Board, moveCount: number): GameOutcome | null {
+  if (!Array.isArray(board)) return null;
+
   const size = board.length;
   // A win requires at least (2*size - 1) moves: size for one player, size-1 for the other.
   if (moveCount < 2 * size - 1) return null;

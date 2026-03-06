@@ -308,6 +308,20 @@ describe('applyMove', () => {
     expect(Array.isArray(next.players)).toBe(true);
     expect(next.players).toEqual([]);
   });
+
+  it('[AI-Review] throws TypeError when state.board is not an array', () => {
+    const state = { ...createGame(), board: null };
+    expect(() => applyMove(state as unknown as GameState, { row: 0, col: 0 }, 'X')).toThrow(
+      TypeError,
+    );
+  });
+
+  it('[AI-Review] does not carry arbitrary source-state properties into the returned state', () => {
+    const state = { ...createGame(), _internal: 'secret', arbitrary: 42 } as unknown as GameState;
+    const next = applyMove(state, { row: 0, col: 0 }, 'X');
+    expect((next as unknown as Record<string, unknown>)._internal).toBeUndefined();
+    expect((next as unknown as Record<string, unknown>).arbitrary).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -595,5 +609,23 @@ describe('checkOutcome — dynamic board support', () => {
       [null, null, null, null],
     ] as unknown as Board;
     expect(checkOutcome(board, 9)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkOutcome — defensive input validation
+// ---------------------------------------------------------------------------
+
+describe('checkOutcome — defensive input validation', () => {
+  it('[AI-Review] returns null when board is null (no crash)', () => {
+    expect(checkOutcome(null as unknown as Board, 5)).toBeNull();
+  });
+
+  it('[AI-Review] returns null when board is undefined (no crash)', () => {
+    expect(checkOutcome(undefined as unknown as Board, 5)).toBeNull();
+  });
+
+  it('[AI-Review] returns null when board is a non-array value (no crash)', () => {
+    expect(checkOutcome('invalid' as unknown as Board, 5)).toBeNull();
   });
 });
