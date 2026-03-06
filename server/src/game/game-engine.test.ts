@@ -143,6 +143,23 @@ describe('applyMove', () => {
     expect(s2.moveCount).toBe(2);
   });
 
+  it('[AI-Review] preserves unchanged state properties (roomId, players)', () => {
+    const players = [
+      {
+        playerId: 'p1',
+        displayName: 'Alice',
+        avatarUrl: '',
+        symbol: 'X' as const,
+        connected: true,
+      },
+      { playerId: 'p2', displayName: 'Bob', avatarUrl: '', symbol: 'O' as const, connected: true },
+    ];
+    const state = createGame('room-42', players);
+    const next = applyMove(state, { row: 0, col: 0 }, 'X');
+    expect(next.roomId).toBe('room-42');
+    expect(next.players).toStrictEqual(players);
+  });
+
   it('6.12 — does not mutate the original state (board immutability)', () => {
     const original = createGame();
     const snapshot = original.board.map((row) => [...row]);
@@ -315,6 +332,35 @@ describe('checkOutcome — diagonal wins', () => {
 // ---------------------------------------------------------------------------
 // checkOutcome — draw
 // ---------------------------------------------------------------------------
+
+describe('checkOutcome — win on 9th move', () => {
+  it('[AI-Review] detects win when the final (9th) move completes a winning line', () => {
+    // Board after all 9 moves (no draw — X wins row 2 on the last move):
+    //   O O X
+    //   X O O
+    //   X X X  ← X completes row 2 on move 9
+    const state = playMoves([
+      [0, 2], // 1 X
+      [0, 0], // 2 O
+      [1, 0], // 3 X
+      [0, 1], // 4 O
+      [2, 0], // 5 X
+      [1, 1], // 6 O
+      [2, 1], // 7 X
+      [1, 2], // 8 O
+      [2, 2], // 9 X ← completes row 2
+    ]);
+    expect(state.moveCount).toBe(9);
+    expect(state.phase).toBe('finished');
+    expect(state.outcome?.type).toBe('win');
+    expect(state.outcome?.winner).toBe('X');
+    expect(state.outcome?.winningLine).toEqual([
+      { row: 2, col: 0 },
+      { row: 2, col: 1 },
+      { row: 2, col: 2 },
+    ]);
+  });
+});
 
 describe('checkOutcome — draw', () => {
   it('6.11 — returns draw when board is full with no winner', () => {

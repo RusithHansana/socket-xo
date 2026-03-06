@@ -83,6 +83,14 @@ export function validateMove(
 ): MoveValidationResult {
   const { row, col } = position;
 
+  if (!Number.isInteger(row) || !Number.isInteger(col)) {
+    return {
+      valid: false,
+      code: 'INVALID_POSITION',
+      message: `Position coordinates must be integers.`,
+    };
+  }
+
   if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
     return {
       valid: false,
@@ -140,16 +148,16 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
  * Returns the GameOutcome if finished, or null if still in progress.
  */
 export function checkOutcome(board: Board, moveCount: number): GameOutcome | null {
-  if (moveCount === BOARD_SIZE * BOARD_SIZE) {
-    return { type: 'draw', winner: null, winningLine: null };
-  }
-
   for (const line of WINNING_LINES) {
     const [a, b, c] = line;
     const cellA = board[a.row][a.col];
     if (cellA !== null && cellA === board[b.row][b.col] && cellA === board[c.row][c.col]) {
-      return { type: 'win', winner: cellA, winningLine: line };
+      return { type: 'win', winner: cellA, winningLine: line.map((p) => ({ ...p })) };
     }
+  }
+
+  if (moveCount === BOARD_SIZE * BOARD_SIZE) {
+    return { type: 'draw', winner: null, winningLine: null };
   }
 
   return null;
