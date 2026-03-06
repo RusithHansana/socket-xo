@@ -20,9 +20,6 @@ function generateWinningLines(size: number): Position[][] {
   return lines;
 }
 
-/** All winning lines for the configured board size (rows, columns, diagonals). */
-const WINNING_LINES: Position[][] = generateWinningLines(BOARD_SIZE);
-
 /**
  * Creates a fresh game state with an empty board.
  * X always goes first.
@@ -35,7 +32,7 @@ export function createGame(roomId = '', players: PlayerInfo[] = []): GameState {
     roomId,
     board,
     currentTurn: 'X',
-    players: players.map((p) => ({ ...p })),
+    players: (Array.isArray(players) ? players : []).map((p) => ({ ...p })),
     phase: 'playing',
     outcome: null,
     moveCount: 0,
@@ -103,6 +100,15 @@ export function validateMove(
     };
   }
 
+  // Guard against jagged/sparse board rows — prevents process crash when board[row] is not an array
+  if (!Array.isArray(state.board[row])) {
+    return {
+      valid: false,
+      code: 'INVALID_POSITION',
+      message: `Position (${row}, ${col}) is out of bounds.`,
+    };
+  }
+
   if (state.phase !== 'playing') {
     return { valid: false, code: 'GAME_OVER', message: 'The game has already ended.' };
   }
@@ -153,17 +159,19 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
  * Returns the GameOutcome if finished, or null if still in progress.
  */
 export function checkOutcome(board: Board, moveCount: number): GameOutcome | null {
-  // A win requires at least 5 moves (3 for one player, 2 for the other).
-  if (moveCount < 5) return null;
+  const size = board.length;
+  // A win requires at least (2*size - 1) moves: size for one player, size-1 for the other.
+  if (moveCount < 2 * size - 1) return null;
 
-  for (const line of WINNING_LINES) {
+  for (const line of generateWinningLines(size)) {
     const first = board[line[0].row][line[0].col];
-    if (first !== null && line.every((p) => board[p.row][p.col] === first)) {
+    // Guard against undefined cells — `undefined === undefined` would be a false-positive win
+    if ((first === 'X' || first === 'O') && line.every((p) => board[p.row][p.col] === first)) {
       return { type: 'win', winner: first, winningLine: line.map((p) => ({ ...p })) };
     }
   }
 
-  if (moveCount === BOARD_SIZE * BOARD_SIZE) {
+  if (moveCount === size * size) {
     return { type: 'draw', winner: null, winningLine: null };
   }
 

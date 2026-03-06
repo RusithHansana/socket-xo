@@ -91,6 +91,12 @@ describe('createGame', () => {
     players[0].displayName = 'Mutated';
     expect(state.players[0].displayName).toBe('Alice');
   });
+
+  it('[AI-Review] treats non-array players argument as empty array without throwing', () => {
+    const state = createGame('room', null as unknown as PlayerInfo[]);
+    expect(state.players).toEqual([]);
+    expect(Array.isArray(state.players)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -185,6 +191,18 @@ describe('validateMove', () => {
     const result = validateMove({} as unknown as GameState, { row: 0, col: 0 }, 'X');
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.code).toBe('INVALID_STATE');
+  });
+
+  it('[AI-Review] handles jagged board (undefined row) without crashing the process', () => {
+    const state: GameState = {
+      ...createGame(),
+      board: [[null, null, null], undefined, [null, null, null]] as unknown as Board,
+    };
+    // row=1 passes the outer bounds check (row < 3) but board[1] is undefined
+    expect(() => validateMove(state, { row: 1, col: 0 }, 'X')).not.toThrow();
+    const result = validateMove(state, { row: 1, col: 0 }, 'X');
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.code).toBe('INVALID_POSITION');
   });
 });
 
@@ -502,5 +520,47 @@ describe('checkOutcome — in progress', () => {
       [null, null, null],
     ] as Board;
     expect(checkOutcome(board, 4)).toBeNull();
+  });
+
+  it('[AI-Review] does not produce false-positive win for board with undefined cells', () => {
+    // A malformed board where all cells in row 0 are undefined (not null).
+    // `undefined === undefined` would be true — the fix guards with (first === 'X' || first === 'O').
+    const board = [
+      [undefined, undefined, undefined] as unknown as (Symbol | null)[],
+      [null, null, null],
+      [null, null, null],
+    ] as unknown as Board;
+    expect(checkOutcome(board, 5)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkOutcome — dynamic board support
+// ---------------------------------------------------------------------------
+
+describe('checkOutcome — dynamic board support', () => {
+  it('[AI-Review] detects win on a 2×2 board using dynamically generated winning lines', () => {
+    // 2×2 board: X X | O null → X wins row 0
+    // Old code: WINNING_LINES was for 3×3 — no 2-cell line existed, win not detected.
+    // New code: generateWinningLines(2) includes [{0,0},{0,1}] — win detected correctly.
+    const board: Board = [
+      ['X', 'X'],
+      ['O', null],
+    ] as unknown as Board;
+    const outcome = checkOutcome(board, 3); // moveCount=3 = 2*2-1 (min moves for a 2×2 win)
+    expect(outcome?.type).toBe('win');
+    expect(outcome?.winner).toBe('X');
+  });
+
+  it('[AI-Review] does not return a false-positive draw for a 4×4 board at moveCount===9', () => {
+    // Old code: moveCount===BOARD_SIZE*BOARD_SIZE (9) fired a draw for a 4×4 board with only 9 moves.
+    // New code: moveCount===board.length*board.length (16) — 9≠16, so null returned correctly.
+    const board: Board = [
+      ['X', 'O', 'X', 'O'],
+      ['O', 'O', 'X', 'O'],
+      ['X', null, null, null],
+      [null, null, null, null],
+    ] as unknown as Board;
+    expect(checkOutcome(board, 9)).toBeNull();
   });
 });
