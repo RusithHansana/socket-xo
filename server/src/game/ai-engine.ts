@@ -1,11 +1,23 @@
-import type { GameState, Position, Symbol } from 'shared';
+import type { GameOutcome, GameState, Position, Symbol } from 'shared';
 import { BOARD_SIZE } from 'shared';
 import { applyMove, checkOutcome, validateMove } from './game-engine.js';
 
-const OPENING_MOVE: Position = {
-  row: Math.floor(BOARD_SIZE / 2),
-  col: Math.floor(BOARD_SIZE / 2),
-};
+const OPENING_MOVES: Position[] = [
+  { row: 0, col: 0 },
+  { row: 0, col: BOARD_SIZE - 1 },
+  { row: Math.floor(BOARD_SIZE / 2), col: Math.floor(BOARD_SIZE / 2) },
+  { row: BOARD_SIZE - 1, col: 0 },
+  { row: BOARD_SIZE - 1, col: BOARD_SIZE - 1 },
+];
+
+function shuffleArray<T>(array: T[]): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
 
 function getOpponentSymbol(symbol: Symbol): Symbol {
   return symbol === 'X' ? 'O' : 'X';
@@ -27,7 +39,7 @@ function getAvailableMoves(state: GameState, symbol: Symbol): Position[] {
   return positions;
 }
 
-function scoreTerminalState(outcome: ReturnType<typeof checkOutcome>, depth: number, aiSymbol: Symbol) {
+function scoreTerminalState(outcome: GameOutcome | null, depth: number, aiSymbol: Symbol) {
   if (outcome == null) {
     return null;
   }
@@ -57,7 +69,9 @@ function minimaxWithPruning(
   const moves = getAvailableMoves(state, currentSymbol);
 
   if (moves.length === 0) {
-    return 0;
+    throw new Error(
+      'minimaxWithPruning: reached non-terminal state with no available moves — invalid game state',
+    );
   }
 
   if (isMaximizing) {
@@ -132,10 +146,11 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
   }
 
   if (state.moveCount === 0) {
-    const openingValidation = validateMove(state, OPENING_MOVE, aiSymbol);
-
-    if (openingValidation.valid) {
-      return OPENING_MOVE;
+    const shuffledOpenings = shuffleArray(OPENING_MOVES);
+    for (const opening of shuffledOpenings) {
+      if (validateMove(state, opening, aiSymbol).valid) {
+        return opening;
+      }
     }
   }
 
@@ -145,7 +160,7 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
   }
 
   // Shuffle for equal-score variety; propagate alpha across siblings for pruning efficiency
-  const shuffledMoves = moves.sort(() => Math.random() - 0.5);
+  const shuffledMoves = shuffleArray(moves);
   let bestMove: Position = shuffledMoves[0];
   let bestScore = Number.NEGATIVE_INFINITY;
   let alpha = Number.NEGATIVE_INFINITY;

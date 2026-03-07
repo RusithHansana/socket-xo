@@ -20,7 +20,7 @@ function getValidMoves(state: GameState, symbol: Symbol): Position[] {
   const positions: Position[] = [];
 
   for (let row = 0; row < state.board.length; row += 1) {
-    for (let col = 0; col < state.board.length; col += 1) {
+    for (let col = 0; col < state.board[row].length; col += 1) {
       const position = { row, col };
       const result = validateMove(state, position, symbol);
 
@@ -112,7 +112,14 @@ describe('getBestMove', () => {
     const move = getBestMove(state, 'X');
     const elapsed = performance.now() - start;
 
-    expect(move).toEqual({ row: 1, col: 1 });
+    const validOpenings: Position[] = [
+      { row: 0, col: 0 },
+      { row: 0, col: 2 },
+      { row: 1, col: 1 },
+      { row: 2, col: 0 },
+      { row: 2, col: 2 },
+    ];
+    expect(validOpenings).toContainEqual(move);
     expect(elapsed).toBeLessThan(200);
   });
 
@@ -128,7 +135,7 @@ describe('getBestMove', () => {
     expect(getBestMove(state, 'O')).toEqual({ row: 1, col: 2 });
   });
 
-  it('5.6 — cannot be beaten when playing first as X', () => {
+  it('5.9 — cannot be beaten when playing first as X', () => {
     assertHumanCannotForceWin(createGame(), 'O', 'X');
   });
 
