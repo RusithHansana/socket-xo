@@ -1,8 +1,7 @@
-import type { Board, GameState, Position, Symbol } from 'shared';
+import type { GameState, Position, Symbol } from 'shared';
 import { BOARD_SIZE } from 'shared';
-import { applyMove, checkOutcome, createGame, validateMove } from './game-engine.js';
+import { applyMove, checkOutcome, validateMove } from './game-engine.js';
 
-const EMPTY_GAME_TEMPLATE = createGame();
 const OPENING_MOVE: Position = {
   row: Math.floor(BOARD_SIZE / 2),
   col: Math.floor(BOARD_SIZE / 2),
@@ -16,7 +15,7 @@ function getAvailableMoves(state: GameState, symbol: Symbol): Position[] {
   const positions: Position[] = [];
 
   for (let row = 0; row < state.board.length; row += 1) {
-    for (let col = 0; col < state.board.length; col += 1) {
+    for (let col = 0; col < state.board[row].length; col += 1) {
       const position = { row, col };
 
       if (validateMove(state, position, symbol).valid) {
@@ -28,19 +27,6 @@ function getAvailableMoves(state: GameState, symbol: Symbol): Position[] {
   return positions;
 }
 
-function isStandardEmptyBoard(board: Board): boolean {
-  if (board.length !== BOARD_SIZE) {
-    return false;
-  }
-
-  return board.every(
-    (row, rowIndex) =>
-      Array.isArray(row) &&
-      row.length === BOARD_SIZE &&
-      row.every((cell, colIndex) => cell === EMPTY_GAME_TEMPLATE.board[rowIndex][colIndex]),
-  );
-}
-
 function scoreTerminalState(outcome: ReturnType<typeof checkOutcome>, depth: number, aiSymbol: Symbol) {
   if (outcome == null) {
     return null;
@@ -50,7 +36,7 @@ function scoreTerminalState(outcome: ReturnType<typeof checkOutcome>, depth: num
     return 0;
   }
 
-  return outcome.winner === aiSymbol ? 10 - depth : -10 + depth;
+  return outcome.winner === aiSymbol ? 1000 - depth : -1000 + depth;
 }
 
 function minimaxWithPruning(
@@ -145,7 +131,7 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
     throw new Error(`getBestMove: it is not ${aiSymbol}'s turn.`);
   }
 
-  if (state.moveCount === 0 && isStandardEmptyBoard(state.board)) {
+  if (state.moveCount === 0) {
     const openingValidation = validateMove(state, OPENING_MOVE, aiSymbol);
 
     if (openingValidation.valid) {
@@ -158,16 +144,20 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
     throw new Error('getBestMove: no valid moves remain for the AI.');
   }
 
-  let bestMove = moves[0];
+  // Shuffle for equal-score variety; propagate alpha across siblings for pruning efficiency
+  const shuffledMoves = moves.sort(() => Math.random() - 0.5);
+  let bestMove: Position = shuffledMoves[0];
   let bestScore = Number.NEGATIVE_INFINITY;
+  let alpha = Number.NEGATIVE_INFINITY;
 
-  for (const move of moves) {
+  for (const move of shuffledMoves) {
     const nextState = applyMove(state, move, aiSymbol);
-    const score = minimax(nextState, 1, false, aiSymbol);
+    const score = minimaxWithPruning(nextState, 1, false, aiSymbol, alpha, Number.POSITIVE_INFINITY);
 
     if (score > bestScore) {
       bestScore = score;
       bestMove = move;
+      alpha = Math.max(alpha, score);
     }
   }
 
