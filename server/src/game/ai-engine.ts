@@ -1,11 +1,16 @@
-import type { GameOutcome, GameState, Position, Symbol } from 'shared';
+import type { GameState, Position, Symbol } from 'shared';
 import { BOARD_SIZE } from 'shared';
-import { applyMove, validateMove } from './game-engine.js';
+import { applyMove, checkOutcome, validateMove } from './game-engine.js';
+
+// Center cell: use integer division — for even BOARD_SIZE there is no true center,
+// so we pick the upper-left quadrant cell closest to center (row/col both floor).
+const CENTER_ROW = Math.floor((BOARD_SIZE - 1) / 2);
+const CENTER_COL = Math.floor((BOARD_SIZE - 1) / 2);
 
 const OPENING_MOVES: Position[] = [
   { row: 0, col: 0 },
   { row: 0, col: BOARD_SIZE - 1 },
-  { row: Math.floor(BOARD_SIZE / 2), col: Math.floor(BOARD_SIZE / 2) },
+  { row: CENTER_ROW, col: CENTER_COL },
   { row: BOARD_SIZE - 1, col: 0 },
   { row: BOARD_SIZE - 1, col: BOARD_SIZE - 1 },
 ];
@@ -45,7 +50,15 @@ function getAvailableMoves(state: GameState): Position[] {
   return positions;
 }
 
-function scoreTerminalState(outcome: GameOutcome | null, depth: number, aiSymbol: Symbol) {
+function scoreTerminalState(
+  state: GameState,
+  depth: number,
+  aiSymbol: Symbol,
+): number | null {
+  // Use checkOutcome() from game-engine as the authoritative terminal-state detector
+  // (satisfies AC #4: AI engine uses game engine for outcome detection).
+  const outcome = checkOutcome(state.board, state.moveCount);
+
   if (outcome == null) {
     return null;
   }
@@ -57,6 +70,10 @@ function scoreTerminalState(outcome: GameOutcome | null, depth: number, aiSymbol
   return outcome.winner === aiSymbol ? 1000 - depth : -1000 + depth;
 }
 
+// Maximum search depth: cap at board size squared (total cells) to prevent stack overflow
+// on boards larger than 3×3. Callers may pass a smaller value to enforce tighter limits.
+const MAX_MINIMAX_DEPTH = BOARD_SIZE * BOARD_SIZE;
+
 function minimaxWithPruning(
   state: GameState,
   depth: number,
@@ -64,9 +81,9 @@ function minimaxWithPruning(
   aiSymbol: Symbol,
   alpha: number,
   beta: number,
-  maxDepth = BOARD_SIZE * BOARD_SIZE,
+  maxDepth: number = MAX_MINIMAX_DEPTH,
 ): number {
-  const terminalScore = scoreTerminalState(state.outcome, depth, aiSymbol);
+  const terminalScore = scoreTerminalState(state, depth, aiSymbol);
 
   if (terminalScore !== null) {
     return terminalScore;
@@ -125,6 +142,15 @@ function minimaxWithPruning(
 export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
   if (state == null || typeof state !== 'object' || Array.isArray(state)) {
     throw new TypeError('getBestMove: state must be a valid GameState object.');
+  }
+
+  // Explicit property existence guards before usage
+  if (!Array.isArray(state.board)) {
+    throw new TypeError('getBestMove: state.board must be an array.');
+  }
+
+  if (typeof state.phase !== 'string') {
+    throw new TypeError('getBestMove: state.phase must be a string.');
   }
 
   if (aiSymbol !== 'X' && aiSymbol !== 'O') {
