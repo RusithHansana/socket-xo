@@ -118,24 +118,6 @@ function minimaxWithPruning(
   return bestScore;
 }
 
-function minimax(
-  state: GameState,
-  depth: number,
-  isMaximizing: boolean,
-  aiSymbol: Symbol,
-  maxDepth = BOARD_SIZE * BOARD_SIZE,
-): number {
-  return minimaxWithPruning(
-    state,
-    depth,
-    isMaximizing,
-    aiSymbol,
-    Number.NEGATIVE_INFINITY,
-    Number.POSITIVE_INFINITY,
-    maxDepth,
-  );
-}
-
 /**
  * Computes the optimal move for the AI player.
  * Uses minimax to exhaustively search the game tree.
