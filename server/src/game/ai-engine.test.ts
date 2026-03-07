@@ -169,4 +169,8 @@ describe('getBestMove', () => {
 
     expect(() => getBestMove(finishedState, 'X')).toThrow(/no valid moves/i);
   });
+
+  it('5.10 — throws TypeError when state is an Array instead of a GameState object', () => {
+    expect(() => getBestMove([] as unknown as GameState, 'X')).toThrow(TypeError);
+  });
 });

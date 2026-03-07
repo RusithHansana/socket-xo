@@ -1,6 +1,6 @@
 import type { GameOutcome, GameState, Position, Symbol } from 'shared';
 import { BOARD_SIZE } from 'shared';
-import { applyMove, checkOutcome, validateMove } from './game-engine.js';
+import { applyMove, validateMove } from './game-engine.js';
 
 const OPENING_MOVES: Position[] = [
   { row: 0, col: 0 },
@@ -23,15 +23,13 @@ function getOpponentSymbol(symbol: Symbol): Symbol {
   return symbol === 'X' ? 'O' : 'X';
 }
 
-function getAvailableMoves(state: GameState, symbol: Symbol): Position[] {
+function getAvailableMoves(state: GameState): Position[] {
   const positions: Position[] = [];
 
   for (let row = 0; row < state.board.length; row += 1) {
     for (let col = 0; col < state.board[row].length; col += 1) {
-      const position = { row, col };
-
-      if (validateMove(state, position, symbol).valid) {
-        positions.push(position);
+      if (state.board[row][col] === null) {
+        positions.push({ row, col });
       }
     }
   }
@@ -59,14 +57,14 @@ function minimaxWithPruning(
   alpha: number,
   beta: number,
 ): number {
-  const terminalScore = scoreTerminalState(checkOutcome(state.board, state.moveCount), depth, aiSymbol);
+  const terminalScore = scoreTerminalState(state.outcome, depth, aiSymbol);
 
   if (terminalScore !== null) {
     return terminalScore;
   }
 
   const currentSymbol = isMaximizing ? aiSymbol : getOpponentSymbol(aiSymbol);
-  const moves = getAvailableMoves(state, currentSymbol);
+  const moves = getAvailableMoves(state);
 
   if (moves.length === 0) {
     throw new Error(
@@ -128,16 +126,15 @@ export function minimax(
  * Uses minimax to exhaustively search the game tree.
  */
 export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
-  if (state == null || typeof state !== 'object') {
-    throw new TypeError('getBestMove: state must be a valid object.');
+  if (state == null || typeof state !== 'object' || Array.isArray(state)) {
+    throw new TypeError('getBestMove: state must be a valid GameState object.');
   }
 
   if (aiSymbol !== 'X' && aiSymbol !== 'O') {
     throw new TypeError(`getBestMove: aiSymbol must be 'X' or 'O', got '${String(aiSymbol)}'.`);
   }
 
-  const currentOutcome = checkOutcome(state.board, state.moveCount);
-  if (state.phase !== 'playing' || currentOutcome !== null) {
+  if (state.phase !== 'playing' || state.outcome !== null) {
     throw new Error('getBestMove: no valid moves remain because the game is already finished.');
   }
 
@@ -154,9 +151,13 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
     }
   }
 
-  const moves = getAvailableMoves(state, aiSymbol);
+  const moves = getAvailableMoves(state);
   if (moves.length === 0) {
     throw new Error('getBestMove: no valid moves remain for the AI.');
+  }
+
+  if (moves.length === 1) {
+    return moves[0];
   }
 
   // Shuffle for equal-score variety; propagate alpha across siblings for pruning efficiency
