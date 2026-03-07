@@ -24,9 +24,17 @@ function getOpponentSymbol(symbol: Symbol): Symbol {
 }
 
 function getAvailableMoves(state: GameState): Position[] {
+  if (!Array.isArray(state.board)) {
+    throw new TypeError('getAvailableMoves: state.board must be an array of arrays.');
+  }
+
   const positions: Position[] = [];
 
   for (let row = 0; row < state.board.length; row += 1) {
+    if (!Array.isArray(state.board[row])) {
+      throw new TypeError(`getAvailableMoves: state.board[${row}] must be an array.`);
+    }
+
     for (let col = 0; col < state.board[row].length; col += 1) {
       if (state.board[row][col] === null) {
         positions.push({ row, col });
@@ -56,11 +64,16 @@ function minimaxWithPruning(
   aiSymbol: Symbol,
   alpha: number,
   beta: number,
+  maxDepth = BOARD_SIZE * BOARD_SIZE,
 ): number {
   const terminalScore = scoreTerminalState(state.outcome, depth, aiSymbol);
 
   if (terminalScore !== null) {
     return terminalScore;
+  }
+
+  if (depth >= maxDepth) {
+    return 0;
   }
 
   const currentSymbol = isMaximizing ? aiSymbol : getOpponentSymbol(aiSymbol);
@@ -77,7 +90,7 @@ function minimaxWithPruning(
 
     for (const move of moves) {
       const nextState = applyMove(state, move, currentSymbol);
-      const score = minimaxWithPruning(nextState, depth + 1, false, aiSymbol, alpha, beta);
+      const score = minimaxWithPruning(nextState, depth + 1, false, aiSymbol, alpha, beta, maxDepth);
       bestScore = Math.max(bestScore, score);
       alpha = Math.max(alpha, score);
 
@@ -93,7 +106,7 @@ function minimaxWithPruning(
 
   for (const move of moves) {
     const nextState = applyMove(state, move, currentSymbol);
-    const score = minimaxWithPruning(nextState, depth + 1, true, aiSymbol, alpha, beta);
+    const score = minimaxWithPruning(nextState, depth + 1, true, aiSymbol, alpha, beta, maxDepth);
     bestScore = Math.min(bestScore, score);
     beta = Math.min(beta, score);
 
@@ -105,11 +118,12 @@ function minimaxWithPruning(
   return bestScore;
 }
 
-export function minimax(
+function minimax(
   state: GameState,
   depth: number,
   isMaximizing: boolean,
   aiSymbol: Symbol,
+  maxDepth = BOARD_SIZE * BOARD_SIZE,
 ): number {
   return minimaxWithPruning(
     state,
@@ -118,6 +132,7 @@ export function minimax(
     aiSymbol,
     Number.NEGATIVE_INFINITY,
     Number.POSITIVE_INFINITY,
+    maxDepth,
   );
 }
 
@@ -134,8 +149,14 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
     throw new TypeError(`getBestMove: aiSymbol must be 'X' or 'O', got '${String(aiSymbol)}'.`);
   }
 
-  if (state.phase !== 'playing' || state.outcome !== null) {
-    throw new Error('getBestMove: no valid moves remain because the game is already finished.');
+  if (state.phase !== 'playing') {
+    throw new Error(
+      `getBestMove: game is not in 'playing' phase (current phase: '${state.phase}').`,
+    );
+  }
+
+  if (state.outcome !== null) {
+    throw new Error('getBestMove: game is already finished (outcome is set).');
   }
 
   if (state.currentTurn !== aiSymbol) {
