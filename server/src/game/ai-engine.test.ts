@@ -186,4 +186,22 @@ describe('getBestMove', () => {
     state.phase = 123;
     expect(() => getBestMove(state, 'X')).toThrow(TypeError);
   });
+
+  it('5.13 — throws TypeError when state.currentTurn is not a valid symbol', () => {
+    const state = createGame() as any;
+    state.currentTurn = 'Z';
+    expect(() => getBestMove(state, 'X')).toThrow(TypeError);
+  });
+
+  it('5.14 — throws TypeError when state.moveCount is a negative number', () => {
+    const state = createGame() as any;
+    state.moveCount = -1;
+    expect(() => getBestMove(state, 'X')).toThrow(TypeError);
+  });
+
+  it('5.15 — throws TypeError when state.outcome property is missing', () => {
+    const state = createGame() as any;
+    delete state.outcome;
+    expect(() => getBestMove(state, 'X')).toThrow(TypeError);
+  });
 });

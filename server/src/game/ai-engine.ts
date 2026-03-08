@@ -25,6 +25,9 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 function getOpponentSymbol(symbol: Symbol): Symbol {
+  if (symbol !== 'X' && symbol !== 'O') {
+    throw new TypeError(`getOpponentSymbol: symbol must be 'X' or 'O', got '${String(symbol)}'.`);
+  }
   return symbol === 'X' ? 'O' : 'X';
 }
 
@@ -55,9 +58,10 @@ function scoreTerminalState(
   depth: number,
   aiSymbol: Symbol,
 ): number | null {
-  // Use checkOutcome() from game-engine as the authoritative terminal-state detector
-  // (satisfies AC #4: AI engine uses game engine for outcome detection).
-  const outcome = checkOutcome(state.board, state.moveCount);
+  // Use state.outcome for fast terminal detection in the hot minimax loop.
+  // state.outcome is set by applyMove after every move — no re-computation needed.
+  // checkOutcome is called once in getBestMove for AC #4 compliance.
+  const outcome = state.outcome;
 
   if (outcome == null) {
     return null;
@@ -90,18 +94,11 @@ function minimaxWithPruning(
   }
 
   if (depth >= maxDepth) {
-    // Evaluate a simple heuristic for truncated search on larger boards:
-    // Count pieces. A fully scaled implementation would evaluate positional advantage.
-    let aiCount = 0;
-    let oppCount = 0;
-    for (let r = 0; r < state.board.length; r += 1) {
-      if (!Array.isArray(state.board[r])) continue;
-      for (let c = 0; c < state.board[r].length; c += 1) {
-        if (state.board[r][c] === aiSymbol) aiCount += 1;
-        else if (state.board[r][c] !== null) oppCount += 1;
-      }
-    }
-    return aiCount - oppCount;
+    // Return neutral score at depth limit. Piece-counting is not a reliable positional
+    // heuristic for Tic-Tac-Toe. For standard 3×3 play this branch is unreachable (every
+    // game reaches a terminal state within maxDepth moves), but it guards against stack
+    // overflow if getBestMove is ever called on a larger board.
+    return 0;
   }
 
   const currentSymbol = isMaximizing ? aiSymbol : getOpponentSymbol(aiSymbol);
@@ -160,6 +157,20 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
     throw new TypeError('getBestMove: state.phase must be a string.');
   }
 
+  if (!('outcome' in state)) {
+    throw new TypeError('getBestMove: state.outcome property is missing.');
+  }
+
+  if (state.currentTurn !== 'X' && state.currentTurn !== 'O') {
+    throw new TypeError(
+      `getBestMove: state.currentTurn must be 'X' or 'O', got '${String(state.currentTurn)}'.`,
+    );
+  }
+
+  if (typeof state.moveCount !== 'number' || !Number.isInteger(state.moveCount) || state.moveCount < 0) {
+    throw new TypeError('getBestMove: state.moveCount must be a non-negative integer.');
+  }
+
   if (aiSymbol !== 'X' && aiSymbol !== 'O') {
     throw new TypeError(`getBestMove: aiSymbol must be 'X' or 'O', got '${String(aiSymbol)}'.`);
   }
@@ -178,6 +189,13 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
     throw new Error(`getBestMove: it is not ${aiSymbol}'s turn.`);
   }
 
+  // Use checkOutcome from game-engine to confirm the position is non-terminal (AC #4 compliance).
+  // Also guards against states where outcome is null but the board is actually terminal.
+  const confirmedOutcome = checkOutcome(state.board, state.moveCount);
+  if (confirmedOutcome !== null) {
+    throw new Error('getBestMove: game-engine confirms the position is already terminal.');
+  }
+
   if (state.moveCount === 0) {
     const shuffledOpenings = shuffleArray(OPENING_MOVES);
     for (const opening of shuffledOpenings) {
@@ -193,6 +211,10 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
   }
 
   if (moves.length === 1) {
+    const singleValidation = validateMove(state, moves[0], aiSymbol);
+    if (!singleValidation.valid) {
+      throw new Error(`getBestMove: only available move is invalid — ${singleValidation.message}`);
+    }
     return moves[0];
   }
 
@@ -213,5 +235,9 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
     }
   }
 
+  const finalValidation = validateMove(state, bestMove, aiSymbol);
+  if (!finalValidation.valid) {
+    throw new Error(`getBestMove: computed best move is invalid — ${finalValidation.message}`);
+  }
   return bestMove;
 }
