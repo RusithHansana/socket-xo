@@ -105,9 +105,14 @@ describe('getBestMove', () => {
     assertHumanCannotForceWin(createGame(), 'X', 'O');
   });
 
-  it('5.5 — returns a pre-computed opening on an empty board (O(1) shortcut, no minimax)', () => {
+  it('5.5 — returns a pre-computed opening on an empty board and completes in < 200ms', () => {
     const state = createGame();
+    
+    const start = Date.now();
     const move = getBestMove(state, 'X');
+    const elapsed = Date.now() - start;
+
+    expect(elapsed).toBeLessThan(200);
 
     const validOpenings: Position[] = [
       { row: 0, col: 0 },
@@ -168,5 +173,17 @@ describe('getBestMove', () => {
 
   it('5.10 — throws TypeError when state is an Array instead of a GameState object', () => {
     expect(() => getBestMove([] as unknown as GameState, 'X')).toThrow(TypeError);
+  });
+
+  it('5.11 — throws TypeError when state.board is missing or not an array', () => {
+    const state = createGame() as any;
+    delete state.board;
+    expect(() => getBestMove(state, 'X')).toThrow(TypeError);
+  });
+
+  it('5.12 — throws TypeError when state.phase is not a string', () => {
+    const state = createGame() as any;
+    state.phase = 123;
+    expect(() => getBestMove(state, 'X')).toThrow(TypeError);
   });
 });

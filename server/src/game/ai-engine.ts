@@ -90,7 +90,18 @@ function minimaxWithPruning(
   }
 
   if (depth >= maxDepth) {
-    return 0;
+    // Evaluate a simple heuristic for truncated search on larger boards:
+    // Count pieces. A fully scaled implementation would evaluate positional advantage.
+    let aiCount = 0;
+    let oppCount = 0;
+    for (let r = 0; r < state.board.length; r += 1) {
+      if (!Array.isArray(state.board[r])) continue;
+      for (let c = 0; c < state.board[r].length; c += 1) {
+        if (state.board[r][c] === aiSymbol) aiCount += 1;
+        else if (state.board[r][c] !== null) oppCount += 1;
+      }
+    }
+    return aiCount - oppCount;
   }
 
   const currentSymbol = isMaximizing ? aiSymbol : getOpponentSymbol(aiSymbol);
@@ -145,10 +156,6 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
   }
 
   // Explicit property existence guards before usage
-  if (!Array.isArray(state.board)) {
-    throw new TypeError('getBestMove: state.board must be an array.');
-  }
-
   if (typeof state.phase !== 'string') {
     throw new TypeError('getBestMove: state.phase must be a string.');
   }
