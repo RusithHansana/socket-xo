@@ -171,6 +171,10 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
     throw new TypeError('getBestMove: state.moveCount must be a non-negative integer.');
   }
 
+  if (!Array.isArray(state.board)) {
+    throw new TypeError('getBestMove: state.board must be an array of arrays.');
+  }
+
   if (aiSymbol !== 'X' && aiSymbol !== 'O') {
     throw new TypeError(`getBestMove: aiSymbol must be 'X' or 'O', got '${String(aiSymbol)}'.`);
   }
