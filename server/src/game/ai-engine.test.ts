@@ -184,9 +184,13 @@ describe('getBestMove', () => {
     assertHumanCannotForceWin(createGame(), 'X', 'O');
   });
 
-  it('5.5 — returns a pre-computed opening on an empty board', () => {
+  it('5.5 — empty-board first move completes in < 200ms (AC #3)', () => {
     const state = createGame();
+    const start = performance.now();
     const move = getBestMove(state, 'X');
+    const elapsed = performance.now() - start;
+
+    expect(elapsed).toBeLessThan(200);
 
     const validOpenings: Position[] = [
       { row: 0, col: 0 },
@@ -250,32 +254,56 @@ describe('getBestMove', () => {
   });
 
   it('5.11 — throws TypeError when state.board is missing or not an array', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const state = createGame() as any;
     delete state.board;
     expect(() => getBestMove(state, 'X')).toThrow(TypeError);
   });
 
   it('5.12 — throws TypeError when state.phase is not a string', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const state = createGame() as any;
     state.phase = 123;
     expect(() => getBestMove(state, 'X')).toThrow(TypeError);
   });
 
   it('5.13 — throws TypeError when state.currentTurn is not a valid symbol', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const state = createGame() as any;
     state.currentTurn = 'Z';
     expect(() => getBestMove(state, 'X')).toThrow(TypeError);
   });
 
   it('5.14 — throws TypeError when state.moveCount is a negative number', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const state = createGame() as any;
     state.moveCount = -1;
     expect(() => getBestMove(state, 'X')).toThrow(TypeError);
   });
 
   it('5.15 — throws TypeError when state.outcome property is missing', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const state = createGame() as any;
     delete state.outcome;
     expect(() => getBestMove(state, 'X')).toThrow(TypeError);
+  });
+
+  it('5.16 — AI plays a full game against itself exercising maximum tree depth (depth-limit guard)', () => {
+    // Exercises the full minimax tree depth by having two optimal AI players trade moves
+    // from an empty board. On 3×3, every game terminates within 9 moves (within
+    // MAX_MINIMAX_DEPTH = min(9, HARD_DEPTH_CAP)), so the depth fallback is never reached.
+    // This validates that depth infrastructure doesn't interfere with correct gameplay
+    // and that the search terminates cleanly at every depth level.
+    let state = createGame();
+    let currentSymbol: Symbol = 'X';
+
+    while (state.phase === 'playing') {
+      const move = getBestMove(state, currentSymbol);
+      state = applyMove(state, move, currentSymbol);
+      currentSymbol = currentSymbol === 'X' ? 'O' : 'X';
+    }
+
+    // Two optimal players always draw on a 3×3 board
+    expect(state.outcome?.type).toBe('draw');
   });
 });

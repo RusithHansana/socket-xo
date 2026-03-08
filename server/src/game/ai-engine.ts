@@ -37,6 +37,7 @@ function getAvailableMoves(state: GameState): Position[] {
   }
 
   const positions: Position[] = [];
+  const symbol = state.currentTurn;
 
   for (let row = 0; row < state.board.length; row += 1) {
     if (!Array.isArray(state.board[row])) {
@@ -44,7 +45,7 @@ function getAvailableMoves(state: GameState): Position[] {
     }
 
     for (let col = 0; col < state.board[row].length; col += 1) {
-      if (state.board[row][col] === null) {
+      if (validateMove(state, { row, col }, symbol).valid) {
         positions.push({ row, col });
       }
     }
@@ -74,9 +75,13 @@ function scoreTerminalState(
   return outcome.winner === aiSymbol ? 1000 - depth : -1000 + depth;
 }
 
-// Maximum search depth: cap at board size squared (total cells) to prevent stack overflow
-// on boards larger than 3×3. Callers may pass a smaller value to enforce tighter limits.
-const MAX_MINIMAX_DEPTH = BOARD_SIZE * BOARD_SIZE;
+// Hard ceiling independent of board geometry: prevents catastrophic event-loop blocking
+// even if BOARD_SIZE is accidentally set to a large value.
+const HARD_DEPTH_CAP = 20;
+
+// Maximum search depth: capped at the smaller of total cells (natural game length)
+// and the hard safety ceiling. For 3×3 boards this resolves to 9.
+const MAX_MINIMAX_DEPTH = Math.min(BOARD_SIZE * BOARD_SIZE, HARD_DEPTH_CAP);
 
 function minimaxWithPruning(
   state: GameState,
@@ -210,9 +215,6 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
   }
 
   const moves = getAvailableMoves(state);
-  if (moves.length === 0) {
-    throw new Error('getBestMove: no valid moves remain for the AI.');
-  }
 
   if (moves.length === 1) {
     const singleValidation = validateMove(state, moves[0], aiSymbol);
