@@ -1,4 +1,4 @@
-import type { GameState, Position, Symbol } from 'shared';
+import type { GameState, Position, Symbol, Board } from 'shared';
 import { BOARD_SIZE } from 'shared';
 import { applyMove, checkOutcome, validateMove } from './game-engine.js';
 
@@ -15,14 +15,7 @@ const OPENING_MOVES: Position[] = [
   { row: BOARD_SIZE - 1, col: BOARD_SIZE - 1 },
 ];
 
-function shuffleArray<T>(array: T[]): T[] {
-  const result = [...array];
-  for (let i = result.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-}
+
 
 function getOpponentSymbol(symbol: Symbol): Symbol {
   if (symbol !== 'X' && symbol !== 'O') {
@@ -51,7 +44,15 @@ function getAvailableMoves(state: GameState): Position[] {
     }
   }
 
-  return positions;
+  // Deterministic move ordering: Center (3), Corners (2), Edges (1)
+  // This drastically improves alpha-beta pruning efficiency without Math.random()
+  const getPosScore = (r: number, c: number) => {
+    if (r === 1 && c === 1) return 3;
+    if ((r === 0 || r === 2) && (c === 0 || c === 2)) return 2;
+    return 1;
+  };
+
+  return positions.sort((a, b) => getPosScore(b.row, b.col) - getPosScore(a.row, a.col));
 }
 
 function scoreTerminalState(
@@ -59,10 +60,9 @@ function scoreTerminalState(
   depth: number,
   aiSymbol: Symbol,
 ): number | null {
-  // Use state.outcome for fast terminal detection in the hot minimax loop.
-  // state.outcome is set by applyMove after every move — no re-computation needed.
-  // checkOutcome is called once in getBestMove for AC #4 compliance.
-  const outcome = state.outcome;
+  // Use checkOutcome from game-engine as required by AC 2.3 & 3.5.
+  const board: Board = state.board;
+  const outcome = checkOutcome(board, state.moveCount);
 
   if (outcome == null) {
     return null;
@@ -149,6 +149,19 @@ function minimaxWithPruning(
 }
 
 /**
+ * Original minimax implementation as requested by story tasks.
+ * Delegates to minimaxWithPruning for actual execution.
+ */
+export function minimax(
+  state: GameState,
+  depth: number,
+  isMaximizing: boolean,
+  aiSymbol: Symbol,
+): number {
+  return minimaxWithPruning(state, depth, isMaximizing, aiSymbol, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY);
+}
+
+/**
  * Computes the optimal move for the AI player.
  * Uses minimax to exhaustively search the game tree.
  */
@@ -206,8 +219,7 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
   }
 
   if (state.moveCount === 0) {
-    const shuffledOpenings = shuffleArray(OPENING_MOVES);
-    for (const opening of shuffledOpenings) {
+    for (const opening of OPENING_MOVES) {
       if (validateMove(state, opening, aiSymbol).valid) {
         return opening;
       }
@@ -224,13 +236,12 @@ export function getBestMove(state: GameState, aiSymbol: Symbol): Position {
     return moves[0];
   }
 
-  // Shuffle for equal-score variety; propagate alpha across siblings for pruning efficiency
-  const shuffledMoves = shuffleArray(moves);
-  let bestMove: Position = shuffledMoves[0];
+  // Evaluate all valid moves; propagate alpha across siblings for pruning efficiency
+  let bestMove: Position = moves[0];
   let bestScore = Number.NEGATIVE_INFINITY;
   let alpha = Number.NEGATIVE_INFINITY;
 
-  for (const move of shuffledMoves) {
+  for (const move of moves) {
     const nextState = applyMove(state, move, aiSymbol);
     const score = minimaxWithPruning(nextState, 1, false, aiSymbol, alpha, Number.POSITIVE_INFINITY);
 
