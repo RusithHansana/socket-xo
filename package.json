@@ -21,6 +21,7 @@
     "eslint-config-prettier": "latest",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "latest",
+    "jsdom": "^28.1.0",
     "prettier": "latest",
     "typescript": "^5.0.0",
     "vite": "^7.3.1",
