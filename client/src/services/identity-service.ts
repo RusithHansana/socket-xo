@@ -8,7 +8,7 @@ export function getOrCreatePlayerId(): string {
     if (existingPlayerId) {
       return existingPlayerId;
     }
-  } catch (error) {
+  } catch {
     // Ignore localStorage access errors (e.g., restricted mode)
   }
 
@@ -26,7 +26,7 @@ export function getOrCreatePlayerId(): string {
 
   try {
     localStorage.setItem(PLAYER_ID_STORAGE_KEY, playerId);
-  } catch (error) {
+  } catch {
     // Ignore localStorage set errors
   }
 

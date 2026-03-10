@@ -1,0 +1,109 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: calc(var(--space-2xl) * 3);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, var(--color-bg-secondary), var(--color-bg-surface));
+  box-shadow: var(--shadow-card);
+  color: var(--color-text-primary);
+  text-align: left;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    filter var(--transition-fast),
+    border-color var(--transition-fast),
+    opacity var(--transition-normal);
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-card), var(--glow-primary);
+}
+
+.card:active {
+  transform: translateY(1px);
+  filter: brightness(0.9);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--space-2xl) + var(--space-sm));
+  height: calc(var(--space-2xl) + var(--space-sm));
+  border-radius: var(--radius-full);
+  background-color: var(--color-bg-primary);
+  color: var(--color-primary);
+  box-shadow: var(--glow-primary);
+}
+
+.title {
+  font: var(--font-heading-md);
+}
+
+.description {
+  color: var(--color-text-secondary);
+  font: var(--font-body);
+}
+
+.skeleton {
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, var(--color-bg-secondary) 0%, var(--color-bg-surface) 50%, var(--color-bg-secondary) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.skeletonIcon,
+.skeletonTitle,
+.skeletonDescription {
+  border-radius: var(--radius-full);
+  background-color: var(--color-bg-primary);
+  opacity: 0.8;
+}
+
+.skeletonIcon {
+  width: calc(var(--space-2xl) + var(--space-sm));
+  height: calc(var(--space-2xl) + var(--space-sm));
+}
+
+.skeletonTitle {
+  width: 55%;
+  height: var(--space-lg);
+  border-radius: var(--radius-md);
+}
+
+.skeletonDescription {
+  width: 80%;
+  height: calc(var(--space-md) + var(--space-xs));
+  border-radius: var(--radius-md);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+    opacity: 0.72;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    background-position: -200% 0;
+    opacity: 0.72;
+  }
+}
