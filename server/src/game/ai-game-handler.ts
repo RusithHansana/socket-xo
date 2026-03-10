@@ -1,6 +1,6 @@
 import type { GameState, Position } from 'shared';
 import type { PlayerInfo } from 'shared';
-import { applyMove, createGame, validateMove } from './game-engine.js';
+import { applyMove, checkOutcome, createGame, validateMove } from './game-engine.js';
 import { getBestMove } from './ai-engine.js';
 
 const AI_PLAYER: PlayerInfo = {
@@ -122,7 +122,8 @@ export function handleAiMove(socketId: string, position: Position): HandleAiMove
 
     const playerState = applyMove(currentState, position, 'X');
 
-    if (playerState.phase === 'finished' || playerState.outcome !== null) {
+    const playerOutcome = checkOutcome(playerState.board, playerState.moveCount);
+    if (playerState.phase === 'finished' || playerOutcome !== null) {
       aiGames.delete(socketId);
       return { playerState, aiState: null, error: null };
     }
@@ -130,7 +131,8 @@ export function handleAiMove(socketId: string, position: Position): HandleAiMove
     const aiMove = getBestMove(playerState, 'O');
     const aiState = applyMove(playerState, aiMove, 'O');
 
-    if (aiState.phase === 'finished' || aiState.outcome !== null) {
+    const aiOutcome = checkOutcome(aiState.board, aiState.moveCount);
+    if (aiState.phase === 'finished' || aiOutcome !== null) {
       aiGames.delete(socketId);
     } else {
       aiGames.set(socketId, aiState);
