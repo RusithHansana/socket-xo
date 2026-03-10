@@ -69,7 +69,7 @@ describe('PlayerIdentity', () => {
     const avatar = container.querySelector('img');
 
     expect(avatar?.getAttribute('src')).toBe(player.avatarUrl);
-    expect(avatar?.getAttribute('alt')).toBe(player.displayName);
+    expect(avatar?.getAttribute('alt')).toBe('');
   });
 
   it('renders the display name and symbol indicator', () => {

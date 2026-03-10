@@ -16,8 +16,11 @@ export function TurnIndicator({ currentTurn, mySymbol }: TurnIndicatorProps) {
   ].join(' ');
 
   return (
-    <div aria-live="polite" aria-atomic="true" className={styles.container}>
-      <span key={currentTurn} className={textClasses}>
+    <div className={styles.container}>
+      <div aria-live="polite" aria-atomic="true" className={styles.srOnly}>
+        {label}
+      </div>
+      <span aria-hidden="true" key={currentTurn} className={textClasses}>
         {label}
       </span>
     </div>

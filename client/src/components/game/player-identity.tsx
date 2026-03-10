@@ -34,20 +34,22 @@ export function PlayerIdentity({ player, isActive }: PlayerIdentityProps) {
 
   return (
     <div
+      role="group"
       className={containerClasses}
       aria-label={`Player ${player.displayName}, playing as ${player.symbol}, ${statusLabel}`}
     >
       <img
         className={avatarClasses}
         src={player.avatarUrl}
-        alt={player.displayName}
+        alt=""
+        role="presentation"
         loading="lazy"
         width={40}
         height={40}
       />
       <div className={styles.info}>
         <div className={styles.nameRow}>
-          <span className={styles.name}>{player.displayName}</span>
+          <span className={styles.name} title={player.displayName}>{player.displayName}</span>
           <span aria-hidden="true" className={symbolClasses}>
             {player.symbol}
           </span>
