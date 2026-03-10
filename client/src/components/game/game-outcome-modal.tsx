@@ -43,15 +43,21 @@ export function GameOutcomeModal({ outcome, mySymbol, onBackToLobby }: GameOutco
     buttonRef.current?.focus();
     // Setting text in useEffect ensures screen readers pick up the dynamic injection
     setAnnouncedHeading(copy.heading);
-  }, [copy.heading]);
+
+    const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onBackToLobby();
+      }
+    };
+
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleGlobalKeyDown);
+    };
+  }, [copy.heading, onBackToLobby]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      onBackToLobby();
-      return;
-    }
-
     if (event.key === 'Tab') {
       event.preventDefault();
       buttonRef.current?.focus();

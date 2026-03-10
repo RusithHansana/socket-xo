@@ -131,7 +131,7 @@ export function registerSocketHandlers(
                   socket.emit('game_over', result.aiState);
                 }
               }
-            }, 600);
+            }, 150);
           }
 
           return;
