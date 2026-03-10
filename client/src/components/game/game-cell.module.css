@@ -1,0 +1,124 @@
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 48px;
+  min-height: 48px;
+  padding: var(--space-sm);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  aspect-ratio: 1;
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+  font: inherit;
+}
+
+.cell:hover:not(:disabled) {
+  background: var(--color-bg-surface);
+}
+
+.cell:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.cell:disabled {
+  cursor: default;
+}
+
+.symbol {
+  width: 70%;
+  height: 70%;
+}
+
+.symbolX {
+  color: var(--color-primary);
+}
+
+.symbolO {
+  color: var(--color-secondary);
+}
+
+.popIn {
+  animation: popIn calc(var(--transition-fast) + 50ms) ease-out;
+  transform-origin: center;
+}
+
+.shaking {
+  animation: shake var(--transition-normal);
+}
+
+.winningCellX {
+  box-shadow: var(--glow-primary);
+  animation: winPulsePrimary 1.5s ease-in-out infinite;
+}
+
+.winningCellO {
+  box-shadow: var(--glow-secondary);
+  animation: winPulseSecondary 1.5s ease-in-out infinite;
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0);
+  }
+
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(calc(var(--space-xs) * -1));
+  }
+
+  40% {
+    transform: translateX(var(--space-xs));
+  }
+
+  60% {
+    transform: translateX(calc(var(--space-xs) * -1));
+  }
+
+  80% {
+    transform: translateX(var(--space-xs));
+  }
+}
+
+@keyframes winPulsePrimary {
+  0%,
+  100% {
+    box-shadow: var(--glow-primary);
+    transform: scale(1);
+  }
+
+  50% {
+    box-shadow: var(--glow-primary);
+    transform: scale(1.02);
+  }
+}
+
+@keyframes winPulseSecondary {
+  0%,
+  100% {
+    box-shadow: var(--glow-secondary);
+    transform: scale(1);
+  }
+
+  50% {
+    box-shadow: var(--glow-secondary);
+    transform: scale(1.02);
+  }
+}

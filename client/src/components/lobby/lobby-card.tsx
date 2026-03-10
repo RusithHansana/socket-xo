@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import styles from './lobby-card.module.css';
 
 export interface LobbyCardProps {

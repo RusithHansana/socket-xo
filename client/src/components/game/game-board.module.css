@@ -1,0 +1,24 @@
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-xs);
+  width: min(80vw, 400px);
+  aspect-ratio: 1;
+  padding: var(--space-xs);
+  border-radius: var(--radius-lg);
+  background: var(--color-border);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--transition-normal);
+}
+
+.row {
+  display: contents;
+}
+
+.myTurn {
+  box-shadow: var(--shadow-card), var(--glow-primary);
+}
+
+.waitingTurn {
+  box-shadow: var(--shadow-card);
+}
