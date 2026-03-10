@@ -237,12 +237,12 @@ describe('AIGamePage', () => {
 
   it('7.19 — Back to Lobby navigates to the lobby route', async () => {
     const router = renderPage();
-    const backButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Back to Lobby'),
+    const backButton = Array.from(container.querySelectorAll('a, button')).find((el) =>
+      el.textContent?.includes('Back to Lobby'),
     );
 
     act(() => {
-      backButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      backButton?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     });
 
     await expect.poll(() => router.state.location.pathname).toBe('/');

@@ -87,6 +87,14 @@ export function registerSocketHandlers(
 
     socket.on('make_move', (payload) => {
       try {
+        if (!payload || typeof payload !== 'object' || typeof payload.roomId !== 'string') {
+          socket.emit('move_rejected', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Move payload is invalid.',
+          });
+          return;
+        }
+
         if (isAiGame(socket.id)) {
           if (payload.roomId !== socket.data.roomId) {
             socket.emit('move_rejected', {
@@ -114,12 +122,16 @@ export function registerSocketHandlers(
           }
 
           if (result.aiState !== null) {
-            socket.emit('game_state_update', result.aiState);
-
-            if (result.aiState.phase === 'finished' || result.aiState.outcome !== null) {
-              socket.data.roomId = null;
-              socket.emit('game_over', result.aiState);
-            }
+            setTimeout(() => {
+              if (result.aiState !== null) {
+                socket.emit('game_state_update', result.aiState);
+    
+                if (result.aiState.phase === 'finished' || result.aiState.outcome !== null) {
+                  socket.data.roomId = null;
+                  socket.emit('game_over', result.aiState);
+                }
+              }
+            }, 600);
           }
 
           return;

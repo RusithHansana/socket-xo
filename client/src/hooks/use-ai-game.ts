@@ -108,7 +108,7 @@ export function useAiGame(): UseAiGameResult {
     };
   }, [identity.avatarUrl, identity.displayName, identity.playerId]);
 
-  const makeMove = (row: number, col: number) => {
+  const makeMove = useCallback((row: number, col: number) => {
     const socket = socketRef.current;
 
     if (socket === null || gameState === null) {
@@ -119,7 +119,7 @@ export function useAiGame(): UseAiGameResult {
       roomId: gameState.roomId,
       position: { row, col },
     });
-  };
+  }, [gameState]);
 
   const resetGame = () => {
     socketRef.current?.emit('start_ai_game');

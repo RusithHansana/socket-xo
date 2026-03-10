@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { GameBoard } from '../components/game/game-board';
 import { GameOutcomeModal } from '../components/game/game-outcome-modal';
 import { PlayerIdentity } from '../components/game/player-identity';
@@ -18,9 +18,9 @@ export default function AIGamePage() {
     return (
       <main className={styles.page}>
         <div className={styles.shell}>
-          <button type="button" className={styles.backButton} onClick={handleBackToLobby}>
+          <Link to="/" className={styles.backButton}>
             Back to Lobby
-          </button>
+          </Link>
           <section className={styles.loadingCard} aria-live="polite" aria-busy="true">
             <p className={styles.loadingEyebrow}>Connecting</p>
             <h1 className={styles.loadingTitle}>Preparing your AI match</h1>
@@ -39,9 +39,9 @@ export default function AIGamePage() {
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
-        <button type="button" className={styles.backButton} onClick={handleBackToLobby}>
+        <Link to="/" className={styles.backButton}>
           Back to Lobby
-        </button>
+        </Link>
 
         <section className={styles.hero}>
           <div>

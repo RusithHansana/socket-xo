@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import type { GameOutcome, Symbol } from 'shared';
 import styles from './game-outcome-modal.module.css';
 
@@ -37,10 +37,13 @@ export function GameOutcomeModal({ outcome, mySymbol, onBackToLobby }: GameOutco
   const titleId = useId();
   const liveRegionId = useId();
   const copy = getOutcomeCopy(outcome, mySymbol);
+  const [announcedHeading, setAnnouncedHeading] = useState('');
 
   useEffect(() => {
     buttonRef.current?.focus();
-  }, []);
+    // Setting text in useEffect ensures screen readers pick up the dynamic injection
+    setAnnouncedHeading(copy.heading);
+  }, [copy.heading]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape') {
@@ -66,7 +69,7 @@ export function GameOutcomeModal({ outcome, mySymbol, onBackToLobby }: GameOutco
         onKeyDown={handleKeyDown}
       >
         <div id={liveRegionId} aria-live="assertive" aria-atomic="true" className={styles.liveRegion}>
-          {copy.heading}
+          {announcedHeading}
         </div>
         <div className={styles.copyBlock}>
           <p className={styles.kicker}>Match Complete</p>
