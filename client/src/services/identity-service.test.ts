@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  clearIdentityCache,
   generateAvatarUrl,
   generateDisplayName,
   getGuestIdentity,
@@ -20,6 +21,7 @@ describe('identity-service', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     localStorage.clear();
+    clearIdentityCache();
   });
 
   it('generates a UUID v4 and stores it in localStorage', () => {
