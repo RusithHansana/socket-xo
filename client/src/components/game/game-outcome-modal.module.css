@@ -9,8 +9,9 @@
   z-index: 100;
 }
 
-@supports (backdrop-filter: blur(4px)) {
+@supports (backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px)) {
   .backdrop {
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
   }
 }

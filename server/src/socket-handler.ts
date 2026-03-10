@@ -125,6 +125,14 @@ export function registerSocketHandlers(
           return;
         }
 
+        if (typeof payload?.roomId === 'string' && payload.roomId.startsWith('ai-')) {
+          socket.emit('move_rejected', {
+            code: 'GAME_OVER',
+            message: 'This AI game has already finished or does not exist.',
+          });
+          return;
+        }
+
         logger.debug(
           { playerId: socket.data.playerId, roomId: payload?.roomId },
           'make_move received',
