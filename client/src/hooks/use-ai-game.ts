@@ -16,13 +16,17 @@ const AI_INFO: PlayerInfo = {
   connected: true,
 };
 
-function createSocket(playerInfo: PlayerInfo): Socket<ServerToClientEvents, ClientToServerEvents> {
+function createSocket(
+  playerId: string,
+  displayName: string,
+  avatarUrl: string,
+): Socket<ServerToClientEvents, ClientToServerEvents> {
   return io({
     autoConnect: false,
     auth: {
-      playerId: playerInfo.playerId,
-      displayName: playerInfo.displayName,
-      avatarUrl: playerInfo.avatarUrl,
+      playerId,
+      displayName,
+      avatarUrl,
     },
   });
 }
@@ -52,7 +56,7 @@ export function useAiGame(): UseAiGameResult {
   };
 
   useEffect(() => {
-    const socket = createSocket(playerInfo);
+    const socket = createSocket(identity.playerId, identity.displayName, identity.avatarUrl);
     socketRef.current = socket;
 
     const handleConnect = () => {
@@ -102,7 +106,7 @@ export function useAiGame(): UseAiGameResult {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [playerInfo.avatarUrl, playerInfo.displayName, playerInfo.playerId]);
+  }, [identity.avatarUrl, identity.displayName, identity.playerId]);
 
   const makeMove = (row: number, col: number) => {
     const socket = socketRef.current;
