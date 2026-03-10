@@ -9,18 +9,6 @@ export interface LobbyCardProps {
   loading?: boolean;
 }
 
-function handleCardKeyDown(
-  event: KeyboardEvent<HTMLButtonElement>,
-  onClick: () => void,
-) {
-  if (event.key !== 'Enter' && event.key !== ' ') {
-    return;
-  }
-
-  event.preventDefault();
-  onClick();
-}
-
 export function LobbyCard({
   title,
   description,
@@ -28,31 +16,31 @@ export function LobbyCard({
   onClick,
   loading = false,
 }: LobbyCardProps) {
-  if (loading) {
-    return (
-      <div className={`${styles.card} ${styles.skeleton}`} data-loading="true" aria-hidden="true">
-        <div className={styles.skeletonIcon} />
-        <div className={styles.skeletonTitle} />
-        <div className={styles.skeletonDescription} />
-      </div>
-    );
-  }
-
   return (
     <button
       type="button"
-      className={styles.card}
+      className={`${styles.card} ${loading ? styles.skeleton : ''}`}
+      data-loading={loading ? 'true' : undefined}
       aria-label={`${title} - ${description}`}
+      aria-busy={loading}
+      disabled={loading}
       onClick={onClick}
-      onKeyDown={(event) => {
-        handleCardKeyDown(event, onClick);
-      }}
     >
-      <span className={styles.icon} aria-hidden="true">
-        {icon}
-      </span>
-      <span className={styles.title}>{title}</span>
-      <span className={styles.description}>{description}</span>
+      {loading ? (
+        <>
+          <div className={styles.skeletonIcon} />
+          <div className={styles.skeletonTitle} />
+          <div className={styles.skeletonDescription} />
+        </>
+      ) : (
+        <>
+          <span className={styles.icon} aria-hidden="true">
+            {icon}
+          </span>
+          <span className={styles.title}>{title}</span>
+          <span className={styles.description}>{description}</span>
+        </>
+      )}
     </button>
   );
 }

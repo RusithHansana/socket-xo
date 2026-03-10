@@ -69,7 +69,7 @@ export default function LobbyPage() {
           </p>
         </div>
 
-        <div id="lobby-actions" className={styles.actions}>
+        <div id="lobby-actions" className={styles.actions} tabIndex={-1}>
           <LobbyCard
             title="Play Online"
             description="Find an opponent and queue for a live match."

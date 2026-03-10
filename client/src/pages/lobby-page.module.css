@@ -13,6 +13,9 @@
   left: var(--space-sm);
   transform: translateY(calc(-1 * (var(--space-2xl) + var(--space-sm))));
   padding: var(--space-sm) var(--space-md);
+  min-height: var(--space-2xl);
+  display: flex;
+  align-items: center;
   border-radius: var(--radius-md);
   background-color: var(--color-bg-surface);
   color: var(--color-primary);

@@ -85,31 +85,9 @@ describe('LobbyCard', () => {
       />,
     );
 
-    const skeleton = container.querySelector('[data-loading="true"]');
-    expect(skeleton).not.toBeNull();
-    expect(container.textContent).not.toContain('Play AI');
-  });
-
-  it('triggers onClick for keyboard Enter and Space interactions', () => {
-    const onClick = vi.fn();
-
-    renderCard(
-      <LobbyCard
-        title="Play Online"
-        description="Find an opponent and start a live match."
-        icon={<span aria-hidden="true">O</span>}
-        onClick={onClick}
-      />,
-    );
-
     const button = container.querySelector('button');
     expect(button).not.toBeNull();
-
-    act(() => {
-      button?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-      button?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
-    });
-
-    expect(onClick).toHaveBeenCalledTimes(2);
+    expect(button?.hasAttribute('disabled')).toBe(true);
+    expect(button?.getAttribute('data-loading')).toBe('true');
   });
 });
