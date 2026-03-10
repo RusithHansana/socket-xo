@@ -1,0 +1,121 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  background: var(--color-bg-overlay);
+  z-index: 100;
+}
+
+@supports (backdrop-filter: blur(4px)) {
+  .backdrop {
+    backdrop-filter: blur(4px);
+  }
+}
+
+.panel {
+  width: min(100%, 28rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(180deg, var(--color-bg-surface) 0%, var(--color-bg-secondary) 100%);
+  box-shadow: var(--shadow-card);
+  animation: slideUp var(--transition-normal);
+}
+
+.copyBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.kicker {
+  color: var(--color-text-secondary);
+  font: var(--font-caption);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.heading {
+  font: var(--font-heading-lg);
+}
+
+.win {
+  color: var(--color-success);
+}
+
+.draw {
+  color: var(--color-text-primary);
+}
+
+.loss {
+  color: var(--color-text-secondary);
+}
+
+.detail {
+  color: var(--color-text-secondary);
+  font: var(--font-body);
+}
+
+.primaryAction {
+  width: 100%;
+  min-height: calc(var(--space-2xl) + var(--space-xs));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-lg);
+  background: var(--color-primary);
+  color: var(--color-bg-primary);
+  font: var(--font-body);
+  font-weight: 600;
+  transition:
+    transform var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.primaryAction:hover {
+  background: var(--color-primary-hover);
+  box-shadow: var(--glow-primary);
+}
+
+.primaryAction:active {
+  transform: translateY(1px);
+}
+
+.liveRegion {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (min-width: 48rem) {
+  .panel {
+    padding: calc(var(--space-xl) + var(--space-sm));
+  }
+}

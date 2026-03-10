@@ -20,6 +20,8 @@ export interface ClientToServerEvents {
   join_queue: () => void;
   /** Leave the matchmaking queue */
   leave_queue: () => void;
+  /** Start a solo AI game */
+  start_ai_game: () => void;
   /** Submit a board move */
   make_move: (payload: MovePayload) => void;
   /** Send a chat message in a room */
