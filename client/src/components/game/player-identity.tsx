@@ -19,7 +19,9 @@ export function PlayerIdentity({ player, isActive }: PlayerIdentityProps) {
   const containerClasses = [
     styles.container,
     player.connected ? (isActive ? styles.active : styles.inactive) : styles.disconnected,
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
   const avatarClasses = [
     styles.avatar,
     player.connected && isActive && player.symbol === 'X' ? styles.activeGlowX : '',
@@ -47,10 +49,10 @@ export function PlayerIdentity({ player, isActive }: PlayerIdentityProps) {
         width={40}
         height={40}
       />
-      <div className={styles.info}>
+      <div aria-hidden="true" className={styles.info}>
         <div className={styles.nameRow}>
           <span className={styles.name} title={player.displayName}>{player.displayName}</span>
-          <span aria-hidden="true" className={symbolClasses}>
+          <span className={symbolClasses}>
             {player.symbol}
           </span>
         </div>

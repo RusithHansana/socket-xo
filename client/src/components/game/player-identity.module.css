@@ -22,6 +22,9 @@
 
 .disconnected {
   opacity: 0.4;
+}
+
+.disconnected .avatar {
   filter: grayscale(1);
 }
 
