@@ -114,6 +114,13 @@ describe('GameBoard', () => {
     expect(cells.every((cell) => cell.hasAttribute('disabled'))).toBe(true);
   });
 
+  it('disables all cells when the disabled prop is true and outcome is null', () => {
+    renderBoard({ disabled: true, outcome: null });
+
+    const cells = Array.from(container.querySelectorAll('button'));
+    expect(cells.every((cell) => cell.hasAttribute('disabled'))).toBe(true);
+  });
+
   it('applies the winning glow class to each winning cell', () => {
     const outcome: GameOutcome = {
       type: 'win',
@@ -154,14 +161,49 @@ describe('GameBoard', () => {
 
     expect(document.activeElement?.id).toBe('cell-0-2');
 
-    const wrappedCell = container.querySelector('#cell-0-2') as HTMLButtonElement | null;
-
+    const wrapperActiveRight = container.querySelector('#cell-0-2') as HTMLButtonElement | null;
     act(() => {
-      wrappedCell?.dispatchEvent(
+      wrapperActiveRight?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+      );
+    });
+
+    expect(document.activeElement?.id).toBe('cell-0-0');
+
+    const activeTopLeft = container.querySelector('#cell-0-0') as HTMLButtonElement | null;
+    act(() => {
+      activeTopLeft?.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }),
       );
     });
 
+    expect(document.activeElement?.id).toBe('cell-2-0');
+
+    const activeBottomLeft = container.querySelector('#cell-2-0') as HTMLButtonElement | null;
+    act(() => {
+      activeBottomLeft?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
+      );
+    });
+
+    expect(document.activeElement?.id).toBe('cell-0-0');
+
+    // Home and End tests
+    act(() => {
+      activeTopLeft?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'End', bubbles: true }),
+      );
+    });
+
     expect(document.activeElement?.id).toBe('cell-2-2');
+
+    const activeEnd = container.querySelector('#cell-2-2') as HTMLButtonElement | null;
+    act(() => {
+      activeEnd?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Home', bubbles: true }),
+      );
+    });
+
+    expect(document.activeElement?.id).toBe('cell-0-0');
   });
 });

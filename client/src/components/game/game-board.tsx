@@ -69,6 +69,14 @@ export function GameBoard({
       case 'ArrowRight':
         nextCol = (col + 1) % BOARD_SIZE;
         break;
+      case 'Home':
+        nextRow = 0;
+        nextCol = 0;
+        break;
+      case 'End':
+        nextRow = BOARD_SIZE - 1;
+        nextCol = BOARD_SIZE - 1;
+        break;
       default:
         return;
     }
