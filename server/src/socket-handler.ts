@@ -1,18 +1,70 @@
 import { Server } from 'socket.io';
 import type {
   ClientToServerEvents,
+  GameState,
+  PlayerInfo,
   ServerToClientEvents,
   InterServerEvents,
   SocketData,
 } from 'shared';
+import { BOARD_SIZE } from 'shared';
 import { cleanupAiGame, handleAiMove, isAiGame, startAiGame } from './game/ai-game-handler.js';
+import {
+  clearReconnectToken,
+  getSession,
+  markDisconnected,
+  rebindSession,
+  registerSession,
+  setSessionSocketDisconnectHandler,
+  validateReconnectToken,
+} from './session/session-manager.js';
 import { logger } from './utils/logger.js';
+
+function createReconnectPlaceholderState(playerId: string, roomId: string): GameState {
+  const player: PlayerInfo = {
+    playerId,
+    displayName: 'Reconnected Player',
+    avatarUrl: `https://robohash.org/${playerId}`,
+    symbol: 'X',
+    connected: true,
+  };
+
+  return {
+    roomId,
+    board: Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => null)),
+    currentTurn: 'X',
+    players: [player],
+    phase: 'waiting',
+    outcome: null,
+    moveCount: 0,
+  };
+}
 
 export function registerSocketHandlers(
   io: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>,
 ): void {
+  setSessionSocketDisconnectHandler((socketId) => {
+    const existingSocket = io.sockets.sockets.get(socketId);
+    existingSocket?.disconnect(true);
+  });
+
   io.on('connection', (socket) => {
-    logger.debug({ socketId: socket.id, playerId: socket.data.playerId }, 'Client connected');
+    try {
+      registerSession(socket.data.playerId, socket.id);
+      logger.debug({ socketId: socket.id, playerId: socket.data.playerId }, 'Client connected');
+    } catch (err) {
+      logger.error(
+        {
+          err: err instanceof Error ? err : new Error(String(err)),
+          playerId: socket.data.playerId,
+          socketId: socket.id,
+        },
+        'Error registering session on connect',
+      );
+      socket.emit('error', { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' });
+      socket.disconnect(true);
+      return;
+    }
 
     socket.on('join_queue', () => {
       try {
@@ -182,8 +234,56 @@ export function registerSocketHandlers(
 
     socket.on('reconnect_attempt', (payload) => {
       try {
-        // TODO: implement in Story 2.1
-        logger.debug({ playerId: payload?.playerId }, 'reconnect_attempt received');
+        if (!payload || typeof payload !== 'object' || typeof payload.playerId !== 'string' || typeof payload.reconnectToken !== 'string') {
+          socket.emit('reconnect_failed', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Reconnect payload is invalid or missing required fields.',
+          });
+          return;
+        }
+
+        const session = validateReconnectToken(payload.playerId, payload.reconnectToken);
+
+        if (session === null) {
+          const existingSession = getSession(payload.playerId);
+
+          socket.emit('reconnect_failed', existingSession === null
+            ? {
+                code: 'SESSION_NOT_FOUND',
+                message: 'No reconnectable session was found for this player.',
+              }
+            : {
+                code: 'INVALID_TOKEN',
+                message: 'The reconnect token is invalid for this player session.',
+              });
+          return;
+        }
+
+        const reboundSession = rebindSession(payload.playerId, socket.id);
+
+        if (reboundSession === null) {
+          socket.emit('reconnect_failed', {
+            code: 'SESSION_NOT_FOUND',
+            message: 'No reconnectable session was found for this player.',
+          });
+          return;
+        }
+
+        clearReconnectToken(payload.playerId);
+        socket.data.roomId = reboundSession.roomId;
+
+        socket.emit(
+          'reconnect_success',
+          createReconnectPlaceholderState(
+            session.playerId,
+            reboundSession.roomId ?? `reconnect-${session.playerId}`,
+          ),
+        );
+
+        logger.debug(
+          { playerId: payload.playerId, socketId: socket.id, roomId: reboundSession.roomId },
+          'reconnect_attempt succeeded',
+        );
       } catch (err) {
         logger.error(
           {
@@ -216,22 +316,44 @@ export function registerSocketHandlers(
     });
 
     socket.on('disconnect', (reason) => {
-      const cleanupResult = cleanupAiGame(socket.id);
-      if (cleanupResult.error !== null) {
-        logger.error(
+      try {
+        const session = markDisconnected(socket.id);
+        logger.debug(
           {
             socketId: socket.id,
             playerId: socket.data.playerId,
-            cleanupError: cleanupResult.error,
+            roomId: session?.roomId ?? null,
+            connected: session?.connected ?? false,
           },
-          'Error cleaning up AI game state on disconnect',
+          'Session marked disconnected',
+        );
+
+        const cleanupResult = cleanupAiGame(socket.id);
+        if (cleanupResult.error !== null) {
+          logger.error(
+            {
+              socketId: socket.id,
+              playerId: socket.data.playerId,
+              cleanupError: cleanupResult.error,
+            },
+            'Error cleaning up AI game state on disconnect',
+          );
+        }
+
+        logger.debug(
+          { socketId: socket.id, playerId: socket.data.playerId, reason },
+          'Client disconnected',
+        );
+      } catch (err) {
+        logger.error(
+          {
+            err: err instanceof Error ? err : new Error(String(err)),
+            playerId: socket.data.playerId,
+            socketId: socket.id,
+          },
+          'Error handling disconnect',
         );
       }
-
-      logger.debug(
-        { socketId: socket.id, playerId: socket.data.playerId, reason },
-        'Client disconnected',
-      );
     });
   });
 }
