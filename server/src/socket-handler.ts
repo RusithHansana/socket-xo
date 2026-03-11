@@ -234,6 +234,14 @@ export function registerSocketHandlers(
 
     socket.on('reconnect_attempt', (payload) => {
       try {
+        if (!payload || typeof payload !== 'object' || typeof payload.playerId !== 'string' || typeof payload.reconnectToken !== 'string') {
+          socket.emit('reconnect_failed', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Reconnect payload is invalid or missing required fields.',
+          });
+          return;
+        }
+
         const session = validateReconnectToken(payload.playerId, payload.reconnectToken);
 
         if (session === null) {

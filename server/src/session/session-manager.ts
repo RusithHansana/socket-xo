@@ -150,5 +150,8 @@ export function rebindSession(playerId: string, newSocketId: string): PlayerSess
 }
 
 export function clearAllSessions(): void {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('clearAllSessions is a test-only helper and cannot be used in production.');
+  }
   sessions.clear();
 }
