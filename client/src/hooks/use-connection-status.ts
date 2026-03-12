@@ -7,5 +7,6 @@ export function useConnectionStatus(): ConnectionState {
   if (ctx === undefined) {
     throw new Error('useConnectionStatus must be used within a ConnectionProvider');
   }
-  return ctx;
+
+  return ctx.state;
 }

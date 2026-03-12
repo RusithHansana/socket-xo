@@ -59,7 +59,10 @@ describe('LobbyPage', () => {
       displayName: 'Player-123',
       avatarUrl: 'https://robohash.org/player-123',
     });
-    mockUseConnectionStatus.mockReturnValue({ status: 'connected' } satisfies ConnectionState);
+    mockUseConnectionStatus.mockReturnValue({
+      status: 'connected',
+      searching: false,
+    } satisfies ConnectionState);
   });
 
   afterEach(() => {
@@ -107,7 +110,10 @@ describe('LobbyPage', () => {
   });
 
   it('shows skeleton loading state when connection is idle or connecting', () => {
-    mockUseConnectionStatus.mockReturnValue({ status: 'connecting' } satisfies ConnectionState);
+    mockUseConnectionStatus.mockReturnValue({
+      status: 'connecting',
+      searching: false,
+    } satisfies ConnectionState);
 
     renderLobby();
 

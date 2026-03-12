@@ -7,5 +7,6 @@ export function useGameState(): GameContextState {
   if (ctx === undefined) {
     throw new Error('useGameState must be used within a GameProvider');
   }
-  return ctx;
+
+  return ctx.state;
 }
