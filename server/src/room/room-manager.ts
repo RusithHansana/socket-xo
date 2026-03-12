@@ -93,13 +93,18 @@ export function getRoom(roomId: string): GameRoom | null {
 }
 
 export function getRoomByPlayerId(playerId: string): GameRoom | null {
+  let foundCompletedRoom: GameRoom | null = null;
+
   for (const room of rooms.values()) {
     if (room.playerIds.includes(playerId)) {
-      return cloneRoom(room);
+      if (room.status !== 'completed') {
+        return cloneRoom(room);
+      }
+      foundCompletedRoom = cloneRoom(room);
     }
   }
 
-  return null;
+  return foundCompletedRoom;
 }
 
 export function addPlayerToRoom(
@@ -107,6 +112,13 @@ export function addPlayerToRoom(
   playerId: string,
   playerInfo: PlayerInfo,
 ): AddPlayerToRoomResult {
+  if (playerId !== playerInfo.playerId) {
+    return {
+      success: false,
+      error: createError('INVALID_PLAYER_ID', `Player ID mismatch: ${playerId} !== ${playerInfo.playerId}`),
+    };
+  }
+
   const room = getStoredRoom(roomId);
 
   if (room === null) {
@@ -130,12 +142,15 @@ export function addPlayerToRoom(
     };
   }
 
+  const existingSymbol = room.state.players[0]?.symbol;
+  const nextSymbol = existingSymbol === 'X' ? 'O' : 'X';
+
   const updatedRoom: GameRoom = {
     ...room,
     playerIds: [...room.playerIds, playerId],
     state: {
       ...room.state,
-      players: [...room.state.players, { ...playerInfo }],
+      players: [...room.state.players, { ...playerInfo, symbol: nextSymbol }],
     },
     status: room.state.phase === 'finished' ? 'completed' : 'active',
   };
