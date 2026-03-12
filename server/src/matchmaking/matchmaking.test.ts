@@ -26,6 +26,13 @@ describe('matchmaking', () => {
     expect(getQueueSize()).toBe(1);
   });
 
+  it('2.3.4.3.1 — addToQueue places player at the front when toFront is true', () => {
+    addToQueue('player-1');
+    addToQueue('player-2', true);
+
+    expect(tryMatchPair()).toEqual(['player-2', 'player-1']);
+  });
+
   it('2.3.4.4 — removeFromQueue removes an existing player', () => {
     addToQueue('player-1');
 

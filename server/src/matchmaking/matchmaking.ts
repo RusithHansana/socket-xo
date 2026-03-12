@@ -1,11 +1,15 @@
 const queue: string[] = [];
 
-export function addToQueue(playerId: string): boolean {
+export function addToQueue(playerId: string, toFront: boolean = false): boolean {
   if (queue.includes(playerId)) {
     return false;
   }
 
-  queue.push(playerId);
+  if (toFront) {
+    queue.unshift(playerId);
+  } else {
+    queue.push(playerId);
+  }
   return true;
 }
 

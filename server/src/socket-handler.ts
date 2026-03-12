@@ -11,7 +11,7 @@ import type {
 import { BOARD_SIZE } from 'shared';
 import { cleanupAiGame, handleAiMove, isAiGame, startAiGame } from './game/ai-game-handler.js';
 import { addToQueue, removeFromQueue, tryMatchPair } from './matchmaking/matchmaking.js';
-import { createRoom } from './room/room-manager.js';
+import { createRoom, getRoomByPlayerId } from './room/room-manager.js';
 import {
   clearReconnectToken,
   getSession,
@@ -87,53 +87,60 @@ function resolveMatchedPlayer(io: AppServer, playerId: string): MatchedPlayer | 
   return { session, socket };
 }
 
-async function handleMatchedPair(io: AppServer, pair: [string, string]): Promise<void> {
-  const [player1Id, player2Id] = pair;
-  const player1 = resolveMatchedPlayer(io, player1Id);
-  const player2 = resolveMatchedPlayer(io, player2Id);
+async function handleMatchedPair(io: AppServer, initialPair: [string, string]): Promise<void> {
+  let currentPair: [string, string] | null = initialPair;
 
-  if (player1 === null || player2 === null) {
-    if (player1 !== null) {
-      addToQueue(player1Id);
+  while (currentPair !== null) {
+    const [player1Id, player2Id] = currentPair;
+    const player1 = resolveMatchedPlayer(io, player1Id);
+    const player2 = resolveMatchedPlayer(io, player2Id);
+
+    if (player1 === null || player2 === null) {
+      if (player1 !== null) {
+        addToQueue(player1Id, true);
+      }
+
+      if (player2 !== null) {
+        addToQueue(player2Id, true);
+      }
+
+      logger.debug(
+        {
+          player1Id,
+          player2Id,
+          player1Available: player1 !== null,
+          player2Available: player2 !== null,
+        },
+        'Aborted matchmaking pair because one or more queued players went stale',
+      );
+      
+      currentPair = tryMatchPair();
+      continue;
     }
 
-    if (player2 !== null) {
-      addToQueue(player2Id);
-    }
+    const room = createRoom(
+      player1Id,
+      player2Id,
+      createOnlinePlayerInfo(player1.socket, player1Id),
+      createOnlinePlayerInfo(player2.socket, player2Id),
+    );
+
+    await Promise.all([player1.socket.join(room.roomId), player2.socket.join(room.roomId)]);
+
+    player1.socket.data.roomId = room.roomId;
+    player2.socket.data.roomId = room.roomId;
+
+    issueReconnectToken(player1.session.playerId, room.roomId);
+    issueReconnectToken(player2.session.playerId, room.roomId);
+
+    io.to(room.roomId).emit('game_start', room.state);
 
     logger.debug(
-      {
-        player1Id,
-        player2Id,
-        player1Available: player1 !== null,
-        player2Available: player2 !== null,
-      },
-      'Aborted matchmaking pair because one or more queued players went stale',
+      { roomId: room.roomId, player1Id, player2Id },
+      'Matched queued players and started an online game',
     );
-    return;
+    break;
   }
-
-  const room = createRoom(
-    player1Id,
-    player2Id,
-    createOnlinePlayerInfo(player1.socket, player1Id),
-    createOnlinePlayerInfo(player2.socket, player2Id),
-  );
-
-  await Promise.all([player1.socket.join(room.roomId), player2.socket.join(room.roomId)]);
-
-  player1.socket.data.roomId = room.roomId;
-  player2.socket.data.roomId = room.roomId;
-
-  issueReconnectToken(player1.session.playerId, room.roomId);
-  issueReconnectToken(player2.session.playerId, room.roomId);
-
-  io.to(room.roomId).emit('game_start', room.state);
-
-  logger.debug(
-    { roomId: room.roomId, player1Id, player2Id },
-    'Matched queued players and started an online game',
-  );
 }
 
 export function registerSocketHandlers(
@@ -164,6 +171,12 @@ export function registerSocketHandlers(
 
     socket.on('join_queue', async () => {
       try {
+        const existingRoom = getRoomByPlayerId(socket.data.playerId);
+        if (existingRoom !== null) {
+          socket.emit('error', { code: 'ALREADY_IN_GAME', message: 'You are already in an active game.' });
+          return;
+        }
+
         const addedToQueue = addToQueue(socket.data.playerId);
 
         socket.emit('queue_joined');
