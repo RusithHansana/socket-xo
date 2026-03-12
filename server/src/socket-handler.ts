@@ -1,7 +1,8 @@
-import { Server } from 'socket.io';
+import { Server, type Socket } from 'socket.io';
 import type {
   ClientToServerEvents,
   GameState,
+  PlayerSession,
   PlayerInfo,
   ServerToClientEvents,
   InterServerEvents,
@@ -9,9 +10,12 @@ import type {
 } from 'shared';
 import { BOARD_SIZE } from 'shared';
 import { cleanupAiGame, handleAiMove, isAiGame, startAiGame } from './game/ai-game-handler.js';
+import { addToQueue, removeFromQueue, tryMatchPair } from './matchmaking/matchmaking.js';
+import { createRoom, getRoomByPlayerId } from './room/room-manager.js';
 import {
   clearReconnectToken,
   getSession,
+  issueReconnectToken,
   markDisconnected,
   rebindSession,
   registerSession,
@@ -19,6 +23,14 @@ import {
   validateReconnectToken,
 } from './session/session-manager.js';
 import { logger } from './utils/logger.js';
+
+type AppServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
+type AppSocket = Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
+
+type MatchedPlayer = {
+  session: PlayerSession;
+  socket: AppSocket;
+};
 
 function createReconnectPlaceholderState(playerId: string, roomId: string): GameState {
   const player: PlayerInfo = {
@@ -40,8 +52,99 @@ function createReconnectPlaceholderState(playerId: string, roomId: string): Game
   };
 }
 
+function createOnlinePlayerInfo(socket: AppSocket, playerId: string): PlayerInfo {
+  const displayName =
+    typeof socket.handshake.auth.displayName === 'string'
+      ? socket.handshake.auth.displayName
+      : `Player-${playerId.slice(0, 4)}`;
+  const avatarUrl =
+    typeof socket.handshake.auth.avatarUrl === 'string'
+      ? socket.handshake.auth.avatarUrl
+      : `https://robohash.org/${playerId}`;
+
+  return {
+    playerId,
+    displayName,
+    avatarUrl,
+    symbol: 'X',
+    connected: true,
+  };
+}
+
+function resolveMatchedPlayer(io: AppServer, playerId: string): MatchedPlayer | null {
+  const session = getSession(playerId);
+
+  if (session === null || session.socketId === null) {
+    return null;
+  }
+
+  const socket = io.sockets.sockets.get(session.socketId);
+
+  if (socket === undefined) {
+    return null;
+  }
+
+  return { session, socket };
+}
+
+async function handleMatchedPair(io: AppServer, initialPair: [string, string]): Promise<void> {
+  let currentPair: [string, string] | null = initialPair;
+
+  while (currentPair !== null) {
+    const [player1Id, player2Id] = currentPair;
+    const player1 = resolveMatchedPlayer(io, player1Id);
+    const player2 = resolveMatchedPlayer(io, player2Id);
+
+    if (player1 === null || player2 === null) {
+      if (player1 !== null) {
+        addToQueue(player1Id, true);
+      }
+
+      if (player2 !== null) {
+        addToQueue(player2Id, true);
+      }
+
+      logger.debug(
+        {
+          player1Id,
+          player2Id,
+          player1Available: player1 !== null,
+          player2Available: player2 !== null,
+        },
+        'Aborted matchmaking pair because one or more queued players went stale',
+      );
+      
+      currentPair = tryMatchPair();
+      continue;
+    }
+
+    const room = createRoom(
+      player1Id,
+      player2Id,
+      createOnlinePlayerInfo(player1.socket, player1Id),
+      createOnlinePlayerInfo(player2.socket, player2Id),
+    );
+
+    await Promise.all([player1.socket.join(room.roomId), player2.socket.join(room.roomId)]);
+
+    player1.socket.data.roomId = room.roomId;
+    player2.socket.data.roomId = room.roomId;
+
+    issueReconnectToken(player1.session.playerId, room.roomId);
+    issueReconnectToken(player2.session.playerId, room.roomId);
+
+    io.to(room.roomId).emit('game_start', room.state);
+
+    logger.debug(
+      { roomId: room.roomId, player1Id, player2Id },
+      'Matched queued players and started an online game',
+    );
+    break;
+  }
+}
+
 export function registerSocketHandlers(
-  io: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>,
+  io: AppServer,
 ): void {
   setSessionSocketDisconnectHandler((socketId) => {
     const existingSocket = io.sockets.sockets.get(socketId);
@@ -66,10 +169,28 @@ export function registerSocketHandlers(
       return;
     }
 
-    socket.on('join_queue', () => {
+    socket.on('join_queue', async () => {
       try {
-        // TODO: implement in Story 2.3
-        logger.debug({ playerId: socket.data.playerId }, 'join_queue received');
+        const existingRoom = getRoomByPlayerId(socket.data.playerId);
+        if (existingRoom !== null) {
+          socket.emit('error', { code: 'ALREADY_IN_GAME', message: 'You are already in an active game.' });
+          return;
+        }
+
+        const addedToQueue = addToQueue(socket.data.playerId);
+
+        socket.emit('queue_joined');
+
+        const pair = tryMatchPair();
+
+        if (pair !== null) {
+          await handleMatchedPair(io, pair);
+        }
+
+        logger.debug(
+          { playerId: socket.data.playerId, addedToQueue, matched: pair !== null },
+          'join_queue received',
+        );
       } catch (err) {
         logger.error(
           {
@@ -84,8 +205,9 @@ export function registerSocketHandlers(
 
     socket.on('leave_queue', () => {
       try {
-        // TODO: implement in Story 2.3
-        logger.debug({ playerId: socket.data.playerId }, 'leave_queue received');
+        const removedFromQueue = removeFromQueue(socket.data.playerId);
+
+        logger.debug({ playerId: socket.data.playerId, removedFromQueue }, 'leave_queue received');
       } catch (err) {
         logger.error(
           {
@@ -317,6 +439,7 @@ export function registerSocketHandlers(
 
     socket.on('disconnect', (reason) => {
       try {
+        const removedFromQueue = removeFromQueue(socket.data.playerId);
         const session = markDisconnected(socket.id);
         logger.debug(
           {
@@ -324,6 +447,7 @@ export function registerSocketHandlers(
             playerId: socket.data.playerId,
             roomId: session?.roomId ?? null,
             connected: session?.connected ?? false,
+            removedFromQueue,
           },
           'Session marked disconnected',
         );
