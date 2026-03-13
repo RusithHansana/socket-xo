@@ -10,6 +10,10 @@ import LobbyPage from './lobby-page';
 const mockUseGuestIdentity = vi.fn();
 const mockUseConnectionStatus = vi.fn();
 const mockUseGameState = vi.fn();
+const mockUseSocket = vi.fn();
+const mockUseConnectionDispatch = vi.fn();
+const mockEmit = vi.fn();
+const mockConnectionDispatch = vi.fn();
 
 vi.mock('../hooks/use-guest-identity', () => ({
   useGuestIdentity: () => mockUseGuestIdentity(),
@@ -21,6 +25,14 @@ vi.mock('../hooks/use-connection-status', () => ({
 
 vi.mock('../hooks/use-game-state', () => ({
   useGameState: () => mockUseGameState(),
+}));
+
+vi.mock('../hooks/use-socket', () => ({
+  useSocket: () => mockUseSocket(),
+}));
+
+vi.mock('../hooks/use-connection-dispatch', () => ({
+  useConnectionDispatch: () => mockUseConnectionDispatch(),
 }));
 
 type ActEnvironmentGlobal = typeof globalThis & {
@@ -82,6 +94,8 @@ describe('LobbyPage', () => {
       moveCount: 0,
       lastMoveError: null,
     });
+    mockUseSocket.mockReturnValue({ emit: mockEmit });
+    mockUseConnectionDispatch.mockReturnValue(mockConnectionDispatch);
   });
 
   afterEach(() => {
@@ -93,6 +107,10 @@ describe('LobbyPage', () => {
     mockUseGuestIdentity.mockReset();
     mockUseConnectionStatus.mockReset();
     mockUseGameState.mockReset();
+    mockUseSocket.mockReset();
+    mockUseConnectionDispatch.mockReset();
+    mockEmit.mockReset();
+    mockConnectionDispatch.mockReset();
     (globalThis as ActEnvironmentGlobal).IS_REACT_ACT_ENVIRONMENT = undefined;
     vi.restoreAllMocks();
   });
@@ -127,6 +145,104 @@ describe('LobbyPage', () => {
 
     await expect.poll(() => router.state.location.pathname).toBe('/ai');
     expect(container.textContent).toContain('AI Destination');
+  });
+
+  it('emits join_queue when Play Online is activated', () => {
+    renderLobby();
+
+    const onlineButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Play Online'));
+
+    expect(onlineButton).not.toBeUndefined();
+
+    act(() => {
+      onlineButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(mockEmit).toHaveBeenCalledWith('join_queue');
+  });
+
+  it('shows matchmaking indicator when searching', () => {
+    mockUseConnectionStatus.mockReturnValue({
+      status: 'connected',
+      searching: true,
+    } satisfies ConnectionState);
+
+    renderLobby();
+
+    expect(container.textContent).toContain('Searching for opponent');
+    expect(container.textContent).not.toContain('Play AI');
+  });
+
+  it('emits leave_queue and clears searching when cancel is clicked', () => {
+    mockUseConnectionStatus.mockReturnValue({
+      status: 'connected',
+      searching: true,
+    } satisfies ConnectionState);
+
+    renderLobby();
+
+    const cancelButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Cancel'));
+
+    expect(cancelButton).not.toBeUndefined();
+
+    act(() => {
+      cancelButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(mockEmit).toHaveBeenCalledWith('leave_queue');
+    expect(mockConnectionDispatch).toHaveBeenCalledWith({ type: 'CLEAR_SEARCHING' });
+  });
+
+  it('shows matched transition before game navigation', () => {
+    vi.useFakeTimers();
+    mockUseConnectionStatus.mockReturnValue({
+      status: 'in_game',
+      searching: false,
+    } satisfies ConnectionState);
+    mockUseGameState.mockReturnValue({
+      roomId: 'room-xyz',
+      board: [
+        [null, null, null],
+        [null, null, null],
+        [null, null, null],
+      ],
+      currentTurn: 'X',
+      players: [],
+      phase: 'playing',
+      outcome: null,
+      moveCount: 0,
+      lastMoveError: null,
+    });
+
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/',
+          element: <LobbyPage />,
+        },
+        {
+          path: '/game/:roomId',
+          element: <div>Online Destination</div>,
+        },
+      ],
+      { initialEntries: ['/'] },
+    );
+
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(<RouterProvider router={router} />);
+    });
+
+    expect(container.textContent).toContain('Match found!');
+    expect(router.state.location.pathname).toBe('/');
+
+    act(() => {
+      vi.advanceTimersByTime(800);
+    });
+
+    expect(router.state.location.pathname).toBe('/game/room-xyz');
+    vi.useRealTimers();
   });
 
   it('shows skeleton loading state when connection is idle or connecting', () => {

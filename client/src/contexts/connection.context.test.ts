@@ -39,4 +39,12 @@ describe('connectionReducer', () => {
     expect(disconnected).toEqual({ status: 'disconnected', searching: false });
     expect(reset).toEqual({ status: 'idle', searching: false });
   });
+
+  it('clears searching while preserving status', () => {
+    const connectedSearching = { status: 'connected', searching: true } as const;
+
+    const cleared = connectionReducer(connectedSearching, { type: 'CLEAR_SEARCHING' });
+
+    expect(cleared).toEqual({ status: 'connected', searching: false });
+  });
 });
