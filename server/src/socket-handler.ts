@@ -10,8 +10,15 @@ import type {
 } from 'shared';
 import { BOARD_SIZE } from 'shared';
 import { cleanupAiGame, handleAiMove, isAiGame, startAiGame } from './game/ai-game-handler.js';
+import { applyMove, validateMove } from './game/game-engine.js';
 import { addToQueue, removeFromQueue, tryMatchPair } from './matchmaking/matchmaking.js';
-import { createRoom, getRoomByPlayerId } from './room/room-manager.js';
+import {
+  createRoom,
+  getRoom,
+  getRoomByPlayerId,
+  markRoomCompleted,
+  updateRoomState,
+} from './room/room-manager.js';
 import {
   clearReconnectToken,
   getSession,
@@ -317,6 +324,51 @@ export function registerSocketHandlers(
             message: 'This AI game has already finished or does not exist.',
           });
           return;
+        }
+
+        const room = getRoom(payload.roomId);
+
+        if (room === null) {
+          socket.emit('move_rejected', {
+            code: 'ROOM_NOT_FOUND',
+            message: `Room ${payload.roomId} was not found.`,
+          });
+          return;
+        }
+
+        const currentPlayer = room.state.players.find(
+          (player) => player.playerId === socket.data.playerId,
+        );
+
+        if (currentPlayer === undefined) {
+          socket.emit('move_rejected', {
+            code: 'NOT_IN_ROOM',
+            message: 'Player is not a member of the specified room.',
+          });
+          return;
+        }
+
+        const validationResult = validateMove(room.state, payload.position, currentPlayer.symbol);
+
+        if (!validationResult.valid) {
+          socket.emit('move_rejected', {
+            code: validationResult.code,
+            message: validationResult.message,
+          });
+          return;
+        }
+
+        const nextState = applyMove(room.state, payload.position, currentPlayer.symbol);
+        updateRoomState(payload.roomId, nextState);
+        io.to(payload.roomId).emit('game_state_update', nextState);
+
+        if (nextState.phase === 'finished') {
+          io.to(payload.roomId).emit('game_over', nextState);
+          markRoomCompleted(payload.roomId);
+
+          for (const playerId of room.playerIds) {
+            clearReconnectToken(playerId);
+          }
         }
 
         logger.debug(

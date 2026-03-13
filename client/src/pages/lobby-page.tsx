@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LobbyCard } from '../components/lobby/lobby-card';
 import { useConnectionStatus } from '../hooks/use-connection-status';
+import { useGameState } from '../hooks/use-game-state';
 import { useGuestIdentity } from '../hooks/use-guest-identity';
 import styles from './lobby-page.module.css';
 
@@ -38,7 +40,14 @@ export default function LobbyPage() {
   const navigate = useNavigate();
   const { displayName, avatarUrl } = useGuestIdentity();
   const { status } = useConnectionStatus();
+  const gameState = useGameState();
   const isLoading = status === 'idle' || status === 'connecting';
+
+  useEffect(() => {
+    if (status === 'in_game' && gameState.roomId !== null) {
+      navigate(`/game/${gameState.roomId}`);
+    }
+  }, [gameState.roomId, navigate, status]);
 
   return (
     <main className={styles.page}>

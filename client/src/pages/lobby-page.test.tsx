@@ -9,6 +9,7 @@ import LobbyPage from './lobby-page';
 
 const mockUseGuestIdentity = vi.fn();
 const mockUseConnectionStatus = vi.fn();
+const mockUseGameState = vi.fn();
 
 vi.mock('../hooks/use-guest-identity', () => ({
   useGuestIdentity: () => mockUseGuestIdentity(),
@@ -16,6 +17,10 @@ vi.mock('../hooks/use-guest-identity', () => ({
 
 vi.mock('../hooks/use-connection-status', () => ({
   useConnectionStatus: () => mockUseConnectionStatus(),
+}));
+
+vi.mock('../hooks/use-game-state', () => ({
+  useGameState: () => mockUseGameState(),
 }));
 
 type ActEnvironmentGlobal = typeof globalThis & {
@@ -63,6 +68,20 @@ describe('LobbyPage', () => {
       status: 'connected',
       searching: false,
     } satisfies ConnectionState);
+    mockUseGameState.mockReturnValue({
+      roomId: null,
+      board: [
+        [null, null, null],
+        [null, null, null],
+        [null, null, null],
+      ],
+      currentTurn: 'X',
+      players: [],
+      phase: 'waiting',
+      outcome: null,
+      moveCount: 0,
+      lastMoveError: null,
+    });
   });
 
   afterEach(() => {
@@ -73,6 +92,7 @@ describe('LobbyPage', () => {
     container.remove();
     mockUseGuestIdentity.mockReset();
     mockUseConnectionStatus.mockReset();
+    mockUseGameState.mockReset();
     (globalThis as ActEnvironmentGlobal).IS_REACT_ACT_ENVIRONMENT = undefined;
     vi.restoreAllMocks();
   });
@@ -120,5 +140,49 @@ describe('LobbyPage', () => {
     const skeletonCards = container.querySelectorAll('[data-loading="true"]');
     expect(skeletonCards).toHaveLength(2);
     expect(container.textContent).toContain('Player-123');
+  });
+
+  it('navigates to /game/:roomId when connection is in_game with an active room', async () => {
+    mockUseConnectionStatus.mockReturnValue({
+      status: 'in_game',
+      searching: false,
+    } satisfies ConnectionState);
+    mockUseGameState.mockReturnValue({
+      roomId: 'room-xyz',
+      board: [
+        [null, null, null],
+        [null, null, null],
+        [null, null, null],
+      ],
+      currentTurn: 'X',
+      players: [],
+      phase: 'playing',
+      outcome: null,
+      moveCount: 0,
+      lastMoveError: null,
+    });
+
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/',
+          element: <LobbyPage />,
+        },
+        {
+          path: '/game/:roomId',
+          element: <div>Online Destination</div>,
+        },
+      ],
+      { initialEntries: ['/'] },
+    );
+
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(<RouterProvider router={router} />);
+    });
+
+    await expect.poll(() => router.state.location.pathname).toBe('/game/room-xyz');
+    expect(container.textContent).toContain('Online Destination');
   });
 });
