@@ -70,7 +70,7 @@ export default function OnlineGamePage() {
 
   const handleBackToLobby = () => {
     gameDispatch({ type: 'RESET' });
-    connectionDispatch({ type: 'RESET' });
+    connectionDispatch({ type: 'LEAVE_GAME' });
     navigate('/');
   };
 

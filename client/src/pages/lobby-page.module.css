@@ -1,5 +1,8 @@
 .page {
   composes: page from './page-base.module.css';
+}
+
+main.page {
   position: relative;
   justify-content: flex-start;
   padding: var(--space-lg) var(--space-md) calc(var(--space-2xl) + env(safe-area-inset-bottom, 0));
@@ -119,7 +122,7 @@
 }
 
 @media (min-width: 48rem) {
-  .page {
+  main.page {
     padding-top: var(--space-2xl);
   }
 

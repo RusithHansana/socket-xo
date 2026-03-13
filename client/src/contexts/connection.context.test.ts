@@ -18,12 +18,14 @@ describe('connectionReducer', () => {
     const searching = connectionReducer(connected, { type: 'SET_SEARCHING' });
     const inGame = connectionReducer(searching, { type: 'SET_IN_GAME' });
     const gameOver = connectionReducer(inGame, { type: 'SET_GAME_OVER' });
+    const leftGame = connectionReducer(gameOver, { type: 'LEAVE_GAME' });
 
     expect(connecting).toEqual({ status: 'connecting', searching: false });
     expect(connected).toEqual({ status: 'connected', searching: false });
     expect(searching).toEqual({ status: 'connected', searching: true });
     expect(inGame).toEqual({ status: 'in_game', searching: false });
     expect(gameOver).toEqual({ status: 'game_over', searching: false });
+    expect(leftGame).toEqual({ status: 'connected', searching: false });
   });
 
   it('ignores invalid transitions and can reset to idle', () => {

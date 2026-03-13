@@ -217,7 +217,7 @@ describe('OnlineGamePage', () => {
     });
 
     expect(gameDispatch).toHaveBeenCalledWith({ type: 'RESET' });
-    expect(connectionDispatch).toHaveBeenCalledWith({ type: 'RESET' });
+    expect(connectionDispatch).toHaveBeenCalledWith({ type: 'LEAVE_GAME' });
     await expect.poll(() => router.state.location.pathname).toBe('/');
   });
 });
