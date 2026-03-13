@@ -6,10 +6,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TypedSocket } from '../services/socket-service';
 import { useSocket } from './use-socket';
+import { SocketProvider } from '../contexts/socket.provider';
 
 const mockUseGuestIdentity = vi.fn();
 const mockUseConnectionDispatch = vi.fn();
 const mockCreateSocketConnection = vi.fn();
+const mockUseSocketEvents = vi.fn();
 
 vi.mock('./use-guest-identity', () => ({
   useGuestIdentity: () => mockUseGuestIdentity(),
@@ -23,6 +25,10 @@ vi.mock('../services/socket-service', () => ({
   createSocketConnection: (...args: unknown[]) => mockCreateSocketConnection(...args),
 }));
 
+vi.mock('./use-socket-events', () => ({
+  useSocketEvents: (...args: unknown[]) => mockUseSocketEvents(...args),
+}));
+
 type ActEnvironmentGlobal = typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean;
 };
@@ -32,7 +38,7 @@ function HookProbe({ onRender }: { onRender: (socket: TypedSocket | null) => voi
   return null;
 }
 
-describe('useSocket', () => {
+describe('useSocket and SocketProvider', () => {
   let container: HTMLDivElement;
   let root: Root | undefined;
 
@@ -58,6 +64,7 @@ describe('useSocket', () => {
     mockUseGuestIdentity.mockReset();
     mockUseConnectionDispatch.mockReset();
     mockCreateSocketConnection.mockReset();
+    mockUseSocketEvents.mockReset();
     (globalThis as ActEnvironmentGlobal).IS_REACT_ACT_ENVIRONMENT = undefined;
     vi.restoreAllMocks();
   });
@@ -67,19 +74,24 @@ describe('useSocket', () => {
     const connect = vi.fn();
     const disconnect = vi.fn();
     const renderedSockets: Array<TypedSocket | null> = [];
-
-    mockUseConnectionDispatch.mockReturnValue(dispatch);
-    mockCreateSocketConnection.mockReturnValue({
+    const mockSocket = {
       connect,
       disconnect,
-    } as unknown as TypedSocket);
+    } as unknown as TypedSocket;
+
+    mockUseConnectionDispatch.mockReturnValue(dispatch);
+    mockCreateSocketConnection.mockReturnValue(mockSocket);
 
     root = createRoot(container);
 
     act(() => {
-      root?.render(<HookProbe onRender={(socket) => {
-        renderedSockets.push(socket);
-      }} />);
+      root?.render(
+        <SocketProvider>
+          <HookProbe onRender={(socket) => {
+            renderedSockets.push(socket);
+          }} />
+        </SocketProvider>
+      );
     });
 
     expect(mockCreateSocketConnection).toHaveBeenCalledWith(
@@ -89,6 +101,7 @@ describe('useSocket', () => {
     );
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CONNECTING' });
     expect(connect).toHaveBeenCalledTimes(1);
+    expect(mockUseSocketEvents).toHaveBeenCalledWith(mockSocket);
     expect(renderedSockets.at(-1)).not.toBeNull();
 
     act(() => {

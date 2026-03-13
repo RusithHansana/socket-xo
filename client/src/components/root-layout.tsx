@@ -3,17 +3,8 @@ import { Outlet, useMatches } from 'react-router-dom';
 import { ConnectionProvider } from '../contexts/connection.provider';
 import { GameProvider } from '../contexts/game.provider';
 import { ChatProvider } from '../contexts/chat.provider';
-import { useSocket } from '../hooks/use-socket';
-import { useSocketEvents } from '../hooks/use-socket-events';
+import { SocketProvider } from '../contexts/socket.provider';
 import PageLoader from './page-loader';
-
-function SocketLifecycle() {
-  const socket = useSocket();
-
-  useSocketEvents(socket);
-
-  return null;
-}
 
 /** Runtime type guard — narrows unknown route handle to an object with a string `title`. */
 function hasTitle(h: unknown): h is { title: string } {
@@ -47,10 +38,11 @@ export default function RootLayout() {
     <ConnectionProvider>
       <GameProvider>
         <ChatProvider>
-          <SocketLifecycle />
-          <Suspense fallback={<PageLoader />}>
-            <Outlet />
-          </Suspense>
+          <SocketProvider>
+            <Suspense fallback={<PageLoader />}>
+              <Outlet />
+            </Suspense>
+          </SocketProvider>
         </ChatProvider>
       </GameProvider>
     </ConnectionProvider>
