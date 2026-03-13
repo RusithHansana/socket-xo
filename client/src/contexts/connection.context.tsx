@@ -25,6 +25,7 @@ export type ConnectionAction =
   | { type: 'SET_GAME_OVER' }
   | { type: 'SET_SEARCHING' }
   | { type: 'CLEAR_SEARCHING' }
+  | { type: 'LEAVE_GAME' }
   | { type: 'RESET' };
 
 export interface ConnectionContextValue {
@@ -119,6 +120,17 @@ export function connectionReducer(
 
       return {
         status: 'game_over',
+        searching: false,
+      };
+    }
+
+    case 'LEAVE_GAME': {
+      if (state.status !== 'in_game' && state.status !== 'game_over') {
+        return state;
+      }
+
+      return {
+        status: 'connected',
         searching: false,
       };
     }
