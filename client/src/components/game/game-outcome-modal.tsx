@@ -5,10 +5,11 @@ import styles from './game-outcome-modal.module.css';
 export interface GameOutcomeModalProps {
   outcome: GameOutcome;
   mySymbol: Symbol;
+  opponentName?: string;
   onBackToLobby: () => void;
 }
 
-function getOutcomeCopy(outcome: GameOutcome, mySymbol: Symbol) {
+function getOutcomeCopy(outcome: GameOutcome, mySymbol: Symbol, opponentName = 'the Computer') {
   if (outcome.type === 'draw') {
     return {
       heading: 'Draw',
@@ -20,23 +21,28 @@ function getOutcomeCopy(outcome: GameOutcome, mySymbol: Symbol) {
   if (outcome.type === 'win' && outcome.winner === mySymbol) {
     return {
       heading: 'You Win!',
-      detail: 'You outplayed the AI and closed the match.',
+      detail: `You outplayed ${opponentName} and closed the match.`,
       variantClassName: styles.win,
     };
   }
 
   return {
     heading: 'You Lose',
-    detail: 'The AI secured the final move this time.',
+    detail: `${opponentName.startsWith('the ') ? opponentName.charAt(0).toUpperCase() + opponentName.slice(1) : opponentName} secured the final move this time.`,
     variantClassName: styles.loss,
   };
 }
 
-export function GameOutcomeModal({ outcome, mySymbol, onBackToLobby }: GameOutcomeModalProps) {
+export function GameOutcomeModal({
+  outcome,
+  mySymbol,
+  opponentName,
+  onBackToLobby,
+}: GameOutcomeModalProps) {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const titleId = useId();
   const liveRegionId = useId();
-  const copy = getOutcomeCopy(outcome, mySymbol);
+  const copy = getOutcomeCopy(outcome, mySymbol, opponentName);
   const [announcedHeading, setAnnouncedHeading] = useState('');
 
   useEffect(() => {

@@ -101,6 +101,9 @@ export default function OnlineGamePage() {
     );
   }
 
+  const opponent = gameState.players.find((p) => p.playerId !== playerId);
+  const opponentName = opponent?.displayName ?? 'your opponent';
+
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
@@ -142,6 +145,7 @@ export default function OnlineGamePage() {
         <GameOutcomeModal
           outcome={gameState.outcome}
           mySymbol={mySymbol}
+          opponentName={opponentName}
           onBackToLobby={handleBackToLobby}
         />
       ) : null}

@@ -77,6 +77,7 @@ export default function AIGamePage() {
         <GameOutcomeModal
           outcome={gameState.outcome}
           mySymbol={playerInfo.symbol}
+          opponentName={aiInfo.displayName}
           onBackToLobby={handleBackToLobby}
         />
       ) : null}
