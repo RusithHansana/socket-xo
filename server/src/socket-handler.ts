@@ -179,7 +179,7 @@ export function registerSocketHandlers(
     socket.on('join_queue', async () => {
       try {
         const existingRoom = getRoomByPlayerId(socket.data.playerId);
-        if (existingRoom !== null) {
+        if (existingRoom !== null && existingRoom.status !== 'completed') {
           socket.emit('error', { code: 'ALREADY_IN_GAME', message: 'You are already in an active game.' });
           return;
         }
