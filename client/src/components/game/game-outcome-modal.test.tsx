@@ -132,4 +132,31 @@ describe('GameOutcomeModal', () => {
 
     expect(document.activeElement).toBe(button);
   });
+
+  it('7.15 — uses custom opponentName in the detail text', () => {
+    renderModal({
+      opponentName: 'John Doe',
+    });
+
+    const detail = container.querySelector('p:not([class*="kicker"])');
+    expect(detail?.textContent).toContain('John Doe');
+  });
+
+  it('7.16 — capitalizes "the AI" at the start of sentence in loss outcome', () => {
+    renderModal({
+      outcome: {
+        type: 'win',
+        winner: 'O',
+        winningLine: [
+          { row: 0, col: 0 },
+          { row: 1, col: 1 },
+          { row: 2, col: 2 },
+        ],
+      },
+      opponentName: 'the AI',
+    });
+
+    const detail = container.querySelector('p:not([class*="kicker"])');
+    expect(detail?.textContent).toMatch(/^The AI/);
+  });
 });
