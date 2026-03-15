@@ -2,6 +2,25 @@ import { describe, expect, it } from 'vitest';
 import {
   connectionReducer,
   getInitialConnectionState,
+  type ConnectionState,
+} from './connection.context';
+
+describe('connectionReducer', () => {
+  it('allows SET_GAME_OVER transition from disconnected status', () => {
+    const initialState: ConnectionState = {
+      ...getInitialConnectionState(),
+      status: 'disconnected',
+    };
+
+    const nextState = connectionReducer(initialState, { type: 'SET_GAME_OVER' });
+
+    expect(nextState.status).toBe('game_over');
+    expect(nextState.searching).toBe(false);
+  });
+});import { describe, expect, it } from 'vitest';
+import {
+  connectionReducer,
+  getInitialConnectionState,
 } from './connection.context';
 
 describe('connectionReducer', () => {

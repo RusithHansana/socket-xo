@@ -18,6 +18,22 @@ function getOutcomeCopy(outcome: GameOutcome, mySymbol: Symbol, opponentName = '
     };
   }
 
+  if (outcome.type === 'forfeit') {
+    if (outcome.winner === mySymbol) {
+      return {
+        heading: 'You Win!',
+        detail: `${opponentName} disconnected and forfeited the match.`,
+        variantClassName: styles.win,
+      };
+    }
+
+    return {
+      heading: 'You Lose',
+      detail: 'Connection was lost and the grace period expired.',
+      variantClassName: styles.loss,
+    };
+  }
+
   if (outcome.type === 'win' && outcome.winner === mySymbol) {
     return {
       heading: 'You Win!',

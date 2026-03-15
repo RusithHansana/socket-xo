@@ -98,6 +98,43 @@ describe('GameOutcomeModal', () => {
     expect(heading?.className).toContain(styles.loss);
   });
 
+  it('renders forfeit win copy when my symbol is winner', () => {
+    renderModal({
+      outcome: {
+        type: 'forfeit',
+        winner: 'X',
+        winningLine: null,
+      },
+      mySymbol: 'X',
+      opponentName: 'Player Two',
+    });
+
+    const heading = container.querySelector('h2');
+    const detail = container.querySelector('p:not([class*="kicker"])');
+
+    expect(heading?.textContent).toBe('You Win!');
+    expect(detail?.textContent).toContain('forfeited the match');
+    expect(heading?.className).toContain(styles.win);
+  });
+
+  it('renders forfeit loss copy when my symbol is not winner', () => {
+    renderModal({
+      outcome: {
+        type: 'forfeit',
+        winner: 'O',
+        winningLine: null,
+      },
+      mySymbol: 'X',
+    });
+
+    const heading = container.querySelector('h2');
+    const detail = container.querySelector('p:not([class*="kicker"])');
+
+    expect(heading?.textContent).toBe('You Lose');
+    expect(detail?.textContent).toContain('grace period expired');
+    expect(heading?.className).toContain(styles.loss);
+  });
+
   it('7.11 — clicking Back to Lobby calls onBackToLobby', () => {
     const props = renderModal();
     const button = container.querySelector('button');

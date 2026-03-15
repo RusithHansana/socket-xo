@@ -1,8 +1,10 @@
-import type { PlayerInfo, Symbol } from 'shared';
+import { useEffect, useRef, useState } from 'react';
+import { GRACE_PERIOD_MS, type PlayerInfo, type Symbol } from 'shared';
 import { useLoaderData, useNavigate } from 'react-router-dom';
 import { GameBoard } from '../components/game/game-board';
 import { GameOutcomeModal } from '../components/game/game-outcome-modal';
 import { PlayerIdentity } from '../components/game/player-identity';
+import { ReconnectOverlay } from '../components/game/reconnect-overlay';
 import { TurnIndicator } from '../components/game/turn-indicator';
 import { useConnectionDispatch } from '../hooks/use-connection-dispatch';
 import { useConnectionStatus } from '../hooks/use-connection-status';
@@ -52,6 +54,31 @@ export default function OnlineGamePage() {
   const socket = useSocket();
   const gameDispatch = useGameDispatch();
   const connectionDispatch = useConnectionDispatch();
+  const [showRecoveredOverlay, setShowRecoveredOverlay] = useState(false);
+  const previousStatusRef = useRef(status);
+
+  useEffect(() => {
+    const previousStatus = previousStatusRef.current;
+
+    if (status === 'disconnected') {
+      setShowRecoveredOverlay(false);
+    }
+
+    if (
+      previousStatus === 'disconnected'
+      && status === 'in_game'
+      && gameState.phase === 'playing'
+      && gameState.outcome === null
+    ) {
+      setShowRecoveredOverlay(true);
+    }
+
+    if (status === 'game_over' || gameState.outcome !== null) {
+      setShowRecoveredOverlay(false);
+    }
+
+    previousStatusRef.current = status;
+  }, [gameState.outcome, gameState.phase, status]);
 
   const activeRoomId = gameState.roomId ?? roomId;
   const myPlayer = gameState.players.find((player) => player.playerId === playerId);
@@ -103,6 +130,9 @@ export default function OnlineGamePage() {
 
   const opponent = gameState.players.find((p) => p.playerId !== playerId);
   const opponentName = opponent?.displayName ?? 'your opponent';
+  const showDisconnectedOverlay = status === 'disconnected' && gameState.phase === 'playing';
+  const showReconnectSuccessOverlay =
+    showRecoveredOverlay && gameState.phase === 'playing' && gameState.outcome === null;
 
   return (
     <main className={styles.page}>
@@ -147,6 +177,14 @@ export default function OnlineGamePage() {
           mySymbol={mySymbol}
           opponentName={opponentName}
           onBackToLobby={handleBackToLobby}
+        />
+      ) : null}
+
+      {showDisconnectedOverlay || showReconnectSuccessOverlay ? (
+        <ReconnectOverlay
+          gracePeriodMs={GRACE_PERIOD_MS}
+          recovered={showReconnectSuccessOverlay}
+          onRecovered={() => setShowRecoveredOverlay(false)}
         />
       ) : null}
     </main>
