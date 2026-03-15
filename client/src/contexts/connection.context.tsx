@@ -115,7 +115,11 @@ export function connectionReducer(
     }
 
     case 'SET_IN_GAME': {
-      if (state.status !== 'connected') {
+      if (
+        state.status !== 'connected'
+        && state.status !== 'disconnected'
+        && state.status !== 'reconnecting'
+      ) {
         return state;
       }
 
@@ -141,7 +145,11 @@ export function connectionReducer(
     }
 
     case 'LEAVE_GAME': {
-      if (state.status !== 'in_game' && state.status !== 'game_over') {
+      if (
+        state.status !== 'in_game'
+        && state.status !== 'game_over'
+        && state.status !== 'disconnected'
+      ) {
         return state;
       }
 

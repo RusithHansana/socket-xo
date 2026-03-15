@@ -101,7 +101,7 @@ describe('useSocket and SocketProvider', () => {
     );
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CONNECTING' });
     expect(connect).toHaveBeenCalledTimes(1);
-    expect(mockUseSocketEvents).toHaveBeenCalledWith(mockSocket);
+    expect(mockUseSocketEvents).toHaveBeenLastCalledWith(mockSocket, 'player-123');
     expect(renderedSockets.at(-1)).not.toBeNull();
 
     act(() => {

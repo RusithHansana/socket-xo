@@ -3,8 +3,13 @@ import type { GameState } from 'shared';
 import { useConnectionDispatch } from './use-connection-dispatch';
 import { useGameDispatch } from './use-game-dispatch';
 import type { TypedSocket } from '../services/socket-service';
+import {
+  clearReconnectToken,
+  getReconnectToken,
+  storeReconnectToken,
+} from '../services/reconnect-token-service';
 
-export function useSocketEvents(socket: TypedSocket | null): void {
+export function useSocketEvents(socket: TypedSocket | null, playerId: string): void {
   const connectionDispatch = useConnectionDispatch();
   const gameDispatch = useGameDispatch();
 
@@ -14,6 +19,14 @@ export function useSocketEvents(socket: TypedSocket | null): void {
     }
 
     const handleConnect = () => {
+      const reconnectToken = getReconnectToken(playerId);
+
+      if (reconnectToken !== null) {
+        connectionDispatch({ type: 'SET_RECONNECTING' });
+        socket.emit('reconnect_attempt', { playerId, reconnectToken });
+        return;
+      }
+
       connectionDispatch({ type: 'SET_CONNECTED' });
     };
 
@@ -43,6 +56,7 @@ export function useSocketEvents(socket: TypedSocket | null): void {
     };
 
     const handleGameOver = (state: GameState) => {
+      clearReconnectToken(playerId);
       connectionDispatch({ type: 'SET_GAME_OVER' });
       gameDispatch({ type: 'GAME_OVER', payload: state });
     };
@@ -53,6 +67,22 @@ export function useSocketEvents(socket: TypedSocket | null): void {
 
     const handlePlayerReconnected = () => {
       gameDispatch({ type: 'OPPONENT_RECONNECTED' });
+    };
+
+    const handleReconnectSuccess = (state: GameState) => {
+      connectionDispatch({ type: 'SET_IN_GAME' });
+      gameDispatch({ type: 'GAME_STATE_UPDATE', payload: state });
+      gameDispatch({ type: 'OPPONENT_RECONNECTED' });
+    };
+
+    const handleReconnectFailed = (payload: { code: string; message: string }) => {
+      clearReconnectToken(playerId);
+      connectionDispatch({ type: 'SET_GAME_OVER' });
+      gameDispatch({ type: 'RECONNECT_FAILED', payload });
+    };
+
+    const handleReconnectToken = (payload: { reconnectToken: string }) => {
+      storeReconnectToken(playerId, payload.reconnectToken);
     };
 
     const handleError = (payload: { code: string; message: string }) => {
@@ -69,6 +99,9 @@ export function useSocketEvents(socket: TypedSocket | null): void {
     socket.on('game_over', handleGameOver);
     socket.on('player_disconnected', handlePlayerDisconnected);
     socket.on('player_reconnected', handlePlayerReconnected);
+    socket.on('reconnect_success', handleReconnectSuccess);
+    socket.on('reconnect_failed', handleReconnectFailed);
+    socket.on('reconnect_token', handleReconnectToken);
     socket.on('error', handleError);
 
     return () => {
@@ -82,7 +115,10 @@ export function useSocketEvents(socket: TypedSocket | null): void {
       socket.off('game_over', handleGameOver);
       socket.off('player_disconnected', handlePlayerDisconnected);
       socket.off('player_reconnected', handlePlayerReconnected);
+      socket.off('reconnect_success', handleReconnectSuccess);
+      socket.off('reconnect_failed', handleReconnectFailed);
+      socket.off('reconnect_token', handleReconnectToken);
       socket.off('error', handleError);
     };
-  }, [connectionDispatch, gameDispatch, socket]);
+  }, [connectionDispatch, gameDispatch, playerId, socket]);
 }

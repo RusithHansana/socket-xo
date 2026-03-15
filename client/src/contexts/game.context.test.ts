@@ -42,6 +42,7 @@ describe('gameReducer', () => {
       ...baseGameState,
       lastMoveError: null,
       opponentDisconnect: null,
+      reconnectError: null,
     });
   });
 
@@ -92,7 +93,7 @@ describe('gameReducer', () => {
       payload: {
         ...baseGameState,
         phase: 'finished',
-        outcome: { type: 'draw' },
+        outcome: { type: 'draw', winner: null, winningLine: null },
       },
     });
 
@@ -110,10 +111,51 @@ describe('gameReducer', () => {
           playerId: 'player-o',
           gracePeriodMs: 30000,
         },
+        reconnectError: {
+          code: 'SESSION_NOT_FOUND',
+          message: 'Session missing',
+        },
       },
       { type: 'RESET' },
     );
 
     expect(resetState).toEqual(getInitialGameState());
+  });
+
+  it('stores reconnect failure error for overlay state', () => {
+    const nextState = gameReducer(getInitialGameState(), {
+      type: 'RECONNECT_FAILED',
+      payload: {
+        code: 'GAME_ENDED',
+        message: 'Game ended during disconnect',
+      },
+    });
+
+    expect(nextState.reconnectError).toEqual({
+      code: 'GAME_ENDED',
+      message: 'Game ended during disconnect',
+    });
+  });
+
+  it('resets game snapshot for invalid token reconnect failures while keeping error', () => {
+    const startedState = gameReducer(getInitialGameState(), {
+      type: 'GAME_START',
+      payload: baseGameState,
+    });
+
+    const nextState = gameReducer(startedState, {
+      type: 'RECONNECT_FAILED',
+      payload: {
+        code: 'SESSION_NOT_FOUND',
+        message: 'Session no longer exists',
+      },
+    });
+
+    expect(nextState.roomId).toBeNull();
+    expect(nextState.phase).toBe('waiting');
+    expect(nextState.reconnectError).toEqual({
+      code: 'SESSION_NOT_FOUND',
+      message: 'Session no longer exists',
+    });
   });
 });

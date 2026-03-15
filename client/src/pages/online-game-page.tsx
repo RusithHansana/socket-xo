@@ -13,6 +13,7 @@ import { useGameDispatch } from '../hooks/use-game-dispatch';
 import { useGameState } from '../hooks/use-game-state';
 import { useGuestIdentity } from '../hooks/use-guest-identity';
 import { useSocket } from '../hooks/use-socket';
+import { clearReconnectToken } from '../services/reconnect-token-service';
 
 /** The resolved success payload from onlineGamePageLoader (redirect path never reaches the component). */
 type LoaderData = { roomId: string };
@@ -117,6 +118,7 @@ export default function OnlineGamePage() {
     ?? (fallbackMe.symbol === 'O' ? fallbackMe : fallbackOpponent);
 
   const handleBackToLobby = () => {
+    clearReconnectToken(playerId);
     gameDispatch({ type: 'RESET' });
     connectionDispatch({ type: 'LEAVE_GAME' });
     navigate('/');
@@ -154,6 +156,7 @@ export default function OnlineGamePage() {
   const showDisconnectedOverlay = status === 'disconnected' && gameState.phase === 'playing';
   const showReconnectSuccessOverlay =
     showRecoveredOverlay && gameState.phase === 'playing' && gameState.outcome === null;
+  const showReconnectFailedOverlay = gameState.reconnectError !== null;
   const showOpponentDisconnectBanner =
     gameState.outcome === null && (gameState.opponentDisconnect !== null || showReconnectedBanner);
 
@@ -211,10 +214,12 @@ export default function OnlineGamePage() {
         />
       ) : null}
 
-      {showDisconnectedOverlay || showReconnectSuccessOverlay ? (
+      {showDisconnectedOverlay || showReconnectSuccessOverlay || showReconnectFailedOverlay ? (
         <ReconnectOverlay
           gracePeriodMs={GRACE_PERIOD_MS}
           recovered={showReconnectSuccessOverlay}
+          failed={gameState.reconnectError}
+          onBackToLobby={handleBackToLobby}
           onRecovered={() => setShowRecoveredOverlay(false)}
         />
       ) : null}

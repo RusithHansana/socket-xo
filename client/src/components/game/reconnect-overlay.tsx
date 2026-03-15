@@ -4,7 +4,9 @@ import styles from './reconnect-overlay.module.css';
 export interface ReconnectOverlayProps {
   gracePeriodMs?: number;
   recovered?: boolean;
+  failed?: { code: string; message: string } | null;
   onRecovered?: () => void;
+  onBackToLobby?: () => void;
 }
 
 function formatSeconds(seconds: number) {
@@ -14,7 +16,9 @@ function formatSeconds(seconds: number) {
 export function ReconnectOverlay({
   gracePeriodMs = 30000,
   recovered = false,
+  failed = null,
   onRecovered,
+  onBackToLobby,
 }: ReconnectOverlayProps) {
   const totalSeconds = useMemo(() => Math.ceil(gracePeriodMs / 1000), [gracePeriodMs]);
   const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
@@ -27,7 +31,7 @@ export function ReconnectOverlay({
   }, [totalSeconds]);
 
   useEffect(() => {
-    if (recovered) {
+    if (recovered || failed !== null) {
       return undefined;
     }
 
@@ -45,7 +49,7 @@ export function ReconnectOverlay({
     return () => {
       clearInterval(timer);
     };
-  }, [recovered]);
+  }, [failed, recovered]);
 
   useEffect(() => {
     previouslyFocusedRef.current = document.activeElement instanceof HTMLElement
@@ -59,6 +63,11 @@ export function ReconnectOverlay({
   }, []);
 
   useEffect(() => {
+    if (failed !== null) {
+      setAnnouncement('Connection could not be restored');
+      return undefined;
+    }
+
     if (!recovered) {
       setAnnouncement('Connection lost. Reconnecting…');
       return undefined;
@@ -73,7 +82,7 @@ export function ReconnectOverlay({
     return () => {
       clearTimeout(doneTimer);
     };
-  }, [onRecovered, recovered]);
+  }, [failed, onRecovered, recovered]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Tab') {
@@ -94,16 +103,30 @@ export function ReconnectOverlay({
       ref={overlayRef}
       role="dialog"
       aria-modal="true"
-      aria-label={recovered ? 'Connection restored' : 'Connection lost. Reconnecting'}
+      aria-label={
+        failed !== null
+          ? 'Connection could not be restored'
+          : recovered
+            ? 'Connection restored'
+            : 'Connection lost. Reconnecting'
+      }
       tabIndex={-1}
-      className={`${styles.overlay} ${recovered ? styles.overlayRecovered : styles.overlayReconnecting}`}
+      className={`${styles.overlay} ${failed !== null ? styles.overlayFailed : recovered ? styles.overlayRecovered : styles.overlayReconnecting}`}
       onKeyDown={handleKeyDown}
     >
       <p className={styles.liveRegion} aria-live="assertive" aria-atomic="true">
         {announcement}
       </p>
 
-      {recovered ? (
+      {failed !== null ? (
+        <div className={styles.content}>
+          <h2 className={styles.errorHeading}>Connection could not be restored</h2>
+          <p className={styles.errorMessage}>{failed.message}</p>
+          <button type="button" className={styles.backButton} onClick={onBackToLobby}>
+            Back to Lobby
+          </button>
+        </div>
+      ) : recovered ? (
         <div className={styles.content}>
           <p className={styles.welcome}>Welcome back!</p>
         </div>

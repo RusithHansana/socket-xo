@@ -10,6 +10,9 @@ import { useSocketEvents } from './use-socket-events';
 
 const mockUseConnectionDispatch = vi.fn();
 const mockUseGameDispatch = vi.fn();
+const mockGetReconnectToken = vi.fn();
+const mockStoreReconnectToken = vi.fn();
+const mockClearReconnectToken = vi.fn();
 
 vi.mock('./use-connection-dispatch', () => ({
   useConnectionDispatch: () => mockUseConnectionDispatch(),
@@ -17,6 +20,12 @@ vi.mock('./use-connection-dispatch', () => ({
 
 vi.mock('./use-game-dispatch', () => ({
   useGameDispatch: () => mockUseGameDispatch(),
+}));
+
+vi.mock('../services/reconnect-token-service', () => ({
+  getReconnectToken: (playerId: string) => mockGetReconnectToken(playerId),
+  storeReconnectToken: (playerId: string, token: string) => mockStoreReconnectToken(playerId, token),
+  clearReconnectToken: (playerId: string) => mockClearReconnectToken(playerId),
 }));
 
 type ActEnvironmentGlobal = typeof globalThis & {
@@ -29,6 +38,7 @@ function createMockSocket() {
   const handlers = new Map<string, SocketHandler>();
 
   const socket = {
+    emit: vi.fn(),
     on: vi.fn((event: string, handler: SocketHandler) => {
       handlers.set(event, handler);
       return socket;
@@ -48,8 +58,8 @@ function createMockSocket() {
   };
 }
 
-function HookProbe({ socket }: { socket: TypedSocket | null }): ReactElement | null {
-  useSocketEvents(socket);
+function HookProbe({ socket, playerId }: { socket: TypedSocket | null; playerId: string }): ReactElement | null {
+  useSocketEvents(socket, playerId);
   return null;
 }
 
@@ -101,6 +111,9 @@ describe('useSocketEvents', () => {
     container.remove();
     mockUseConnectionDispatch.mockReset();
     mockUseGameDispatch.mockReset();
+    mockGetReconnectToken.mockReset();
+    mockStoreReconnectToken.mockReset();
+    mockClearReconnectToken.mockReset();
     (globalThis as ActEnvironmentGlobal).IS_REACT_ACT_ENVIRONMENT = undefined;
     vi.restoreAllMocks();
   });
@@ -114,9 +127,10 @@ describe('useSocketEvents', () => {
     mockUseGameDispatch.mockReturnValue(gameDispatch);
 
     root = createRoot(container);
+    mockGetReconnectToken.mockReturnValue(null);
 
     act(() => {
-      root?.render(<HookProbe socket={socket} />);
+      root?.render(<HookProbe socket={socket} playerId="player-x" />);
     });
 
     handlers.get('connect')?.();
@@ -126,6 +140,9 @@ describe('useSocketEvents', () => {
     handlers.get('move_rejected')?.({ code: 'CELL_TAKEN', message: 'Cell already occupied' });
     handlers.get('player_disconnected')?.({ playerId: 'player-o', gracePeriodMs: 30000 });
     handlers.get('player_reconnected')?.({ playerId: 'player-o' });
+    handlers.get('reconnect_token')?.({ reconnectToken: 'token-1' });
+    handlers.get('reconnect_success')?.(sampleGameState);
+    handlers.get('reconnect_failed')?.({ code: 'SESSION_NOT_FOUND', message: 'Session missing' });
     handlers.get('game_over')?.({
       ...sampleGameState,
       phase: 'finished',
@@ -157,6 +174,57 @@ describe('useSocketEvents', () => {
     expect(gameDispatch).toHaveBeenCalledWith({
       type: 'OPPONENT_RECONNECTED',
     });
+    expect(gameDispatch).toHaveBeenCalledWith({
+      type: 'RECONNECT_FAILED',
+      payload: { code: 'SESSION_NOT_FOUND', message: 'Session missing' },
+    });
+    expect(mockStoreReconnectToken).toHaveBeenCalledWith('player-x', 'token-1');
+    expect(mockClearReconnectToken).toHaveBeenCalledWith('player-x');
+  });
+
+  it('emits reconnect_attempt and transitions to reconnecting on connect when token exists', () => {
+    const connectionDispatch = vi.fn();
+    const gameDispatch = vi.fn();
+    const { socket, handlers } = createMockSocket();
+
+    mockUseConnectionDispatch.mockReturnValue(connectionDispatch);
+    mockUseGameDispatch.mockReturnValue(gameDispatch);
+    mockGetReconnectToken.mockReturnValue('token-abc');
+
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(<HookProbe socket={socket} playerId="player-x" />);
+    });
+
+    handlers.get('connect')?.();
+
+    expect(connectionDispatch).toHaveBeenCalledWith({ type: 'SET_RECONNECTING' });
+    expect(socket.emit).toHaveBeenCalledWith('reconnect_attempt', {
+      playerId: 'player-x',
+      reconnectToken: 'token-abc',
+    });
+  });
+
+  it('dispatches SET_CONNECTED on connect when reconnect token does not exist', () => {
+    const connectionDispatch = vi.fn();
+    const gameDispatch = vi.fn();
+    const { socket, handlers } = createMockSocket();
+
+    mockUseConnectionDispatch.mockReturnValue(connectionDispatch);
+    mockUseGameDispatch.mockReturnValue(gameDispatch);
+    mockGetReconnectToken.mockReturnValue(null);
+
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(<HookProbe socket={socket} playerId="player-x" />);
+    });
+
+    handlers.get('connect')?.();
+
+    expect(connectionDispatch).toHaveBeenCalledWith({ type: 'SET_CONNECTED' });
+    expect(socket.emit).not.toHaveBeenCalledWith('reconnect_attempt', expect.anything());
   });
 
   it('logs server error payloads and unregisters listeners on cleanup', () => {
@@ -169,9 +237,10 @@ describe('useSocketEvents', () => {
     mockUseGameDispatch.mockReturnValue(gameDispatch);
 
     root = createRoot(container);
+    mockGetReconnectToken.mockReturnValue(null);
 
     act(() => {
-      root?.render(<HookProbe socket={socket} />);
+      root?.render(<HookProbe socket={socket} playerId="player-x" />);
     });
 
     handlers.get('error')?.({ code: 'SERVER_ERROR', message: 'Unexpected error' });
@@ -196,6 +265,9 @@ describe('useSocketEvents', () => {
         'move_rejected',
         'player_disconnected',
         'player_reconnected',
+        'reconnect_token',
+        'reconnect_success',
+        'reconnect_failed',
         'game_over',
         'error',
       ]),
