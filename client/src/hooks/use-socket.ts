@@ -7,5 +7,8 @@ export function useSocket(): TypedSocket | null {
   if (socket === undefined) {
     throw new Error('useSocket must be used within a SocketProvider');
   }
+  //TODO: Remove in production - only for testing purposes
+  (window as any).socket = socket; // Expose the socket for testing purposes
+
   return socket;
 }
