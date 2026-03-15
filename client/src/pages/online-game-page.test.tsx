@@ -205,6 +205,18 @@ describe('OnlineGamePage', () => {
     expect(container.textContent).toContain('Back to Lobby');
   });
 
+  it('renders reconnect overlay while disconnected mid-game', async () => {
+    mockUseConnectionStatus.mockReturnValue({
+      status: 'disconnected',
+      searching: false,
+    } satisfies ConnectionState);
+
+    await renderPage();
+
+    expect(container.textContent).toContain('Reconnecting…');
+    expect(container.textContent).toContain('0:30');
+  });
+
   it('resets game and connection contexts before navigating back to lobby', async () => {
     const router = await renderPage();
 

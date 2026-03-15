@@ -21,6 +21,7 @@ export type ConnectionAction =
   | { type: 'SET_CONNECTING' }
   | { type: 'SET_CONNECTED' }
   | { type: 'SET_DISCONNECTED' }
+  | { type: 'SET_RECONNECTING' }
   | { type: 'SET_IN_GAME' }
   | { type: 'SET_GAME_OVER' }
   | { type: 'SET_SEARCHING' }
@@ -80,6 +81,17 @@ export function connectionReducer(
       };
     }
 
+    case 'SET_RECONNECTING': {
+      if (state.status !== 'disconnected') {
+        return state;
+      }
+
+      return {
+        status: 'reconnecting',
+        searching: false,
+      };
+    }
+
     case 'SET_SEARCHING': {
       if (state.status !== 'connected') {
         return state;
@@ -114,7 +126,11 @@ export function connectionReducer(
     }
 
     case 'SET_GAME_OVER': {
-      if (state.status !== 'connected' && state.status !== 'in_game') {
+      if (
+        state.status !== 'connected'
+        && state.status !== 'in_game'
+        && state.status !== 'disconnected'
+      ) {
         return state;
       }
 
