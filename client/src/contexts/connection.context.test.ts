@@ -6,24 +6,6 @@ import {
 } from './connection.context';
 
 describe('connectionReducer', () => {
-  it('allows SET_GAME_OVER transition from disconnected status', () => {
-    const initialState: ConnectionState = {
-      ...getInitialConnectionState(),
-      status: 'disconnected',
-    };
-
-    const nextState = connectionReducer(initialState, { type: 'SET_GAME_OVER' });
-
-    expect(nextState.status).toBe('game_over');
-    expect(nextState.searching).toBe(false);
-  });
-});import { describe, expect, it } from 'vitest';
-import {
-  connectionReducer,
-  getInitialConnectionState,
-} from './connection.context';
-
-describe('connectionReducer', () => {
   it('starts in idle with searching disabled', () => {
     expect(getInitialConnectionState()).toEqual({
       status: 'idle',
@@ -45,6 +27,30 @@ describe('connectionReducer', () => {
     expect(inGame).toEqual({ status: 'in_game', searching: false });
     expect(gameOver).toEqual({ status: 'game_over', searching: false });
     expect(leftGame).toEqual({ status: 'connected', searching: false });
+  });
+
+  it('allows disconnected to reconnecting transition', () => {
+    const initialState: ConnectionState = {
+      ...getInitialConnectionState(),
+      status: 'disconnected',
+    };
+
+    const nextState = connectionReducer(initialState, { type: 'SET_RECONNECTING' });
+
+    expect(nextState.status).toBe('reconnecting');
+    expect(nextState.searching).toBe(false);
+  });
+
+  it('allows SET_GAME_OVER transition from disconnected status', () => {
+    const initialState: ConnectionState = {
+      ...getInitialConnectionState(),
+      status: 'disconnected',
+    };
+
+    const nextState = connectionReducer(initialState, { type: 'SET_GAME_OVER' });
+
+    expect(nextState.status).toBe('game_over');
+    expect(nextState.searching).toBe(false);
   });
 
   it('ignores invalid transitions and can reset to idle', () => {

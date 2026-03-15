@@ -21,6 +21,7 @@ export type ConnectionAction =
   | { type: 'SET_CONNECTING' }
   | { type: 'SET_CONNECTED' }
   | { type: 'SET_DISCONNECTED' }
+  | { type: 'SET_RECONNECTING' }
   | { type: 'SET_IN_GAME' }
   | { type: 'SET_GAME_OVER' }
   | { type: 'SET_SEARCHING' }
@@ -76,6 +77,17 @@ export function connectionReducer(
 
       return {
         status: 'disconnected',
+        searching: false,
+      };
+    }
+
+    case 'SET_RECONNECTING': {
+      if (state.status !== 'disconnected') {
+        return state;
+      }
+
+      return {
+        status: 'reconnecting',
         searching: false,
       };
     }
