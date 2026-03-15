@@ -1,24 +1,24 @@
 import { Server, type Socket } from 'socket.io';
 import type {
   ClientToServerEvents,
-  GameState,
   PlayerSession,
   PlayerInfo,
   ServerToClientEvents,
   InterServerEvents,
   SocketData,
 } from 'shared';
-import { BOARD_SIZE } from 'shared';
 import { cleanupAiGame, handleAiMove, isAiGame, startAiGame } from './game/ai-game-handler.js';
 import { applyMove, validateMove } from './game/game-engine.js';
 import { addToQueue, removeFromQueue, tryMatchPair } from './matchmaking/matchmaking.js';
 import {
   createRoom,
+  getGameState,
   getRoom,
   getRoomByPlayerId,
   markRoomCompleted,
   updateRoomState,
 } from './room/room-manager.js';
+import { cancelGraceTimer, startGraceTimer } from './room/grace-timer.js';
 import {
   clearReconnectToken,
   getSession,
@@ -29,6 +29,7 @@ import {
   setSessionSocketDisconnectHandler,
   validateReconnectToken,
 } from './session/session-manager.js';
+import { config } from './config.js';
 import { logger } from './utils/logger.js';
 
 type AppServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
@@ -38,26 +39,6 @@ type MatchedPlayer = {
   session: PlayerSession;
   socket: AppSocket;
 };
-
-function createReconnectPlaceholderState(playerId: string, roomId: string): GameState {
-  const player: PlayerInfo = {
-    playerId,
-    displayName: 'Reconnected Player',
-    avatarUrl: `https://robohash.org/${playerId}`,
-    symbol: 'X',
-    connected: true,
-  };
-
-  return {
-    roomId,
-    board: Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => null)),
-    currentTurn: 'X',
-    players: [player],
-    phase: 'waiting',
-    outcome: null,
-    moveCount: 0,
-  };
-}
 
 function createOnlinePlayerInfo(socket: AppSocket, playerId: string): PlayerInfo {
   const displayName =
@@ -406,7 +387,7 @@ export function registerSocketHandlers(
       }
     });
 
-    socket.on('reconnect_attempt', (payload) => {
+    socket.on('reconnect_attempt', async (payload) => {
       try {
         if (!payload || typeof payload !== 'object' || typeof payload.playerId !== 'string' || typeof payload.reconnectToken !== 'string') {
           socket.emit('reconnect_failed', {
@@ -446,13 +427,41 @@ export function registerSocketHandlers(
         clearReconnectToken(payload.playerId);
         socket.data.roomId = reboundSession.roomId;
 
-        socket.emit(
-          'reconnect_success',
-          createReconnectPlaceholderState(
-            session.playerId,
-            reboundSession.roomId ?? `reconnect-${session.playerId}`,
-          ),
-        );
+        cancelGraceTimer(payload.playerId);
+
+        if (reboundSession.roomId !== null) {
+          await socket.join(reboundSession.roomId);
+
+          const room = getRoom(reboundSession.roomId);
+
+          if (room !== null && room.status === 'active' && !reboundSession.roomId.startsWith('ai-')) {
+            const updatedState = {
+              ...room.state,
+              players: room.state.players.map((player) =>
+                player.playerId === payload.playerId
+                  ? { ...player, connected: true }
+                  : player,
+              ),
+            };
+
+            updateRoomState(reboundSession.roomId, updatedState);
+            io.to(reboundSession.roomId).emit('game_state_update', updatedState);
+            io.to(reboundSession.roomId).emit('player_reconnected', { playerId: payload.playerId });
+          }
+        }
+
+        const roomState =
+          reboundSession.roomId === null ? null : getGameState(reboundSession.roomId);
+
+        if (roomState === null) {
+          socket.emit('reconnect_failed', {
+            code: 'ROOM_NOT_FOUND',
+            message: 'No active game state was found for this reconnecting session.',
+          });
+          return;
+        }
+
+        socket.emit('reconnect_success', roomState);
 
         logger.debug(
           { playerId: payload.playerId, socketId: socket.id, roomId: reboundSession.roomId },
@@ -514,6 +523,75 @@ export function registerSocketHandlers(
             },
             'Error cleaning up AI game state on disconnect',
           );
+        }
+
+        if (session !== null && session.roomId !== null) {
+          const room = getRoomByPlayerId(session.playerId);
+
+          if (
+            room !== null
+            && room.roomId === session.roomId
+            && room.status === 'active'
+            && !room.roomId.startsWith('ai-')
+          ) {
+            const disconnectedState = {
+              ...room.state,
+              players: room.state.players.map((player) =>
+                player.playerId === session.playerId
+                  ? { ...player, connected: false }
+                  : player,
+              ),
+            };
+
+            updateRoomState(room.roomId, disconnectedState);
+            io.to(room.roomId).emit('game_state_update', disconnectedState);
+            io.to(room.roomId).emit('player_disconnected', {
+              playerId: session.playerId,
+              gracePeriodMs: config.gracePeriodMs,
+            });
+
+            startGraceTimer(session.playerId, config.gracePeriodMs, () => {
+              try {
+                const activeRoom = getRoom(room.roomId);
+
+                if (activeRoom === null || activeRoom.status !== 'active') {
+                  return;
+                }
+
+                const remainingConnectedPlayer = activeRoom.state.players.find((player) => player.connected);
+                const outcome = remainingConnectedPlayer === undefined
+                  ? { type: 'draw' as const, winner: null, winningLine: null }
+                  : {
+                      type: 'forfeit' as const,
+                      winner: remainingConnectedPlayer.symbol,
+                      winningLine: null,
+                    };
+
+                const finalState = {
+                  ...activeRoom.state,
+                  phase: 'finished' as const,
+                  outcome,
+                };
+
+                updateRoomState(activeRoom.roomId, finalState);
+                io.to(activeRoom.roomId).emit('game_over', finalState);
+                markRoomCompleted(activeRoom.roomId);
+
+                for (const playerId of activeRoom.playerIds) {
+                  clearReconnectToken(playerId);
+                }
+              } catch (err) {
+                logger.error(
+                  {
+                    err: err instanceof Error ? err : new Error(String(err)),
+                    playerId: session.playerId,
+                    roomId: room.roomId,
+                  },
+                  'Error resolving grace period expiry',
+                );
+              }
+            });
+          }
         }
 
         logger.debug(

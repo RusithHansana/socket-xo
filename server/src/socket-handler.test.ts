@@ -3,6 +3,7 @@ import type { GameState, MovePayload } from 'shared';
 
 const {
   mockGetRoom,
+  mockGetGameState,
   mockUpdateRoomState,
   mockMarkRoomCompleted,
   mockGetRoomByPlayerId,
@@ -24,8 +25,11 @@ const {
   mockHandleAiMove,
   mockCleanupAiGame,
   mockIsAiGame,
+  mockStartGraceTimer,
+  mockCancelGraceTimer,
 } = vi.hoisted(() => ({
   mockGetRoom: vi.fn(),
+  mockGetGameState: vi.fn(),
   mockUpdateRoomState: vi.fn(),
   mockMarkRoomCompleted: vi.fn(),
   mockGetRoomByPlayerId: vi.fn(),
@@ -47,14 +51,28 @@ const {
   mockHandleAiMove: vi.fn(),
   mockCleanupAiGame: vi.fn(),
   mockIsAiGame: vi.fn(),
+  mockStartGraceTimer: vi.fn(),
+  mockCancelGraceTimer: vi.fn(),
 }));
 
 vi.mock('./room/room-manager.js', () => ({
   createRoom: mockCreateRoom,
+  getGameState: mockGetGameState,
   getRoomByPlayerId: mockGetRoomByPlayerId,
   getRoom: mockGetRoom,
   updateRoomState: mockUpdateRoomState,
   markRoomCompleted: mockMarkRoomCompleted,
+}));
+
+vi.mock('./room/grace-timer.js', () => ({
+  startGraceTimer: mockStartGraceTimer,
+  cancelGraceTimer: mockCancelGraceTimer,
+}));
+
+vi.mock('./config.js', () => ({
+  config: {
+    gracePeriodMs: 30_000,
+  },
 }));
 
 vi.mock('./game/game-engine.js', () => ({
@@ -204,6 +222,29 @@ function triggerMakeMove(socket: MockSocket, payload: MovePayload): void {
   }
 
   handler(payload);
+}
+
+function triggerDisconnect(socket: MockSocket): void {
+  const handler = socket.listeners.get('disconnect');
+
+  if (handler === undefined) {
+    throw new Error('Expected disconnect handler to be registered.');
+  }
+
+  handler('transport close');
+}
+
+async function triggerReconnectAttempt(
+  socket: MockSocket,
+  payload: { playerId: string; reconnectToken: string },
+): Promise<void> {
+  const handler = socket.listeners.get('reconnect_attempt');
+
+  if (handler === undefined) {
+    throw new Error('Expected reconnect_attempt handler to be registered.');
+  }
+
+  await handler(payload);
 }
 
 function expectRoomBroadcast(io: MockServer, roomId: string, eventName: string, payload: unknown): void {
@@ -389,5 +430,247 @@ describe('registerSocketHandlers make_move (online)', () => {
     expect(mockMarkRoomCompleted).toHaveBeenCalledWith('room-1');
     expect(mockClearReconnectToken).toHaveBeenCalledWith('player-1');
     expect(mockClearReconnectToken).toHaveBeenCalledWith('player-2');
+  });
+});
+
+describe('registerSocketHandlers disconnect/reconnect grace flow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockIsAiGame.mockReturnValue(false);
+    mockGetRoomByPlayerId.mockReturnValue(null);
+    mockTryMatchPair.mockReturnValue(null);
+    mockCleanupAiGame.mockReturnValue({ error: null });
+    mockRegisterSession.mockReturnValue({
+      playerId: 'player-1',
+      socketId: 'player-1-socket',
+      roomId: 'room-1',
+      reconnectToken: null,
+      connected: true,
+    });
+  });
+
+  it('3.1.5.3 — disconnect in active online game emits player_disconnected and starts grace timer', () => {
+    const io = createIo();
+    const socket = createSocket('player-1', 'room-1');
+    const roomState = createState();
+
+    mockMarkDisconnected.mockReturnValue({
+      playerId: 'player-1',
+      socketId: null,
+      roomId: 'room-1',
+      reconnectToken: 'token-1',
+      connected: false,
+    });
+    mockGetRoomByPlayerId.mockReturnValue(createRoom(roomState));
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+    triggerDisconnect(socket);
+
+    const expectedState = {
+      ...roomState,
+      players: roomState.players.map((player) =>
+        player.playerId === 'player-1' ? { ...player, connected: false } : player,
+      ),
+    };
+
+    expect(mockUpdateRoomState).toHaveBeenCalledWith('room-1', expectedState);
+    expect(mockStartGraceTimer).toHaveBeenCalledTimes(1);
+    expect(mockStartGraceTimer).toHaveBeenCalledWith('player-1', 30_000, expect.any(Function));
+
+    const roomChannels = io.to.mock.results.map((result) => result.value as { emit: ReturnType<typeof vi.fn> });
+    expect(roomChannels).toHaveLength(2);
+    expect(roomChannels[0]?.emit).toHaveBeenCalledWith('game_state_update', expectedState);
+    expect(roomChannels[1]?.emit).toHaveBeenCalledWith('player_disconnected', {
+      playerId: 'player-1',
+      gracePeriodMs: 30_000,
+    });
+  });
+
+  it('3.1.5.4 — grace timer expiry resolves forfeit and emits game_over', () => {
+    const io = createIo();
+    const socket = createSocket('player-1', 'room-1');
+    const roomState = createState({
+      players: [
+        { ...createState().players[0]!, connected: false },
+        { ...createState().players[1]!, connected: true },
+      ],
+    });
+
+    mockMarkDisconnected.mockReturnValue({
+      playerId: 'player-1',
+      socketId: null,
+      roomId: 'room-1',
+      reconnectToken: 'token-1',
+      connected: false,
+    });
+    mockGetRoomByPlayerId.mockReturnValue(createRoom(roomState));
+    mockGetRoom.mockReturnValue(createRoom(roomState));
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+    triggerDisconnect(socket);
+
+    const onExpiry = mockStartGraceTimer.mock.calls[0]?.[2] as (() => void) | undefined;
+    expect(onExpiry).toBeTypeOf('function');
+
+    onExpiry?.();
+
+    const expectedFinalState = {
+      ...roomState,
+      phase: 'finished' as const,
+      outcome: {
+        type: 'forfeit' as const,
+        winner: 'O' as const,
+        winningLine: null,
+      },
+    };
+
+    expect(mockUpdateRoomState).toHaveBeenCalledWith('room-1', expectedFinalState);
+    expect(mockMarkRoomCompleted).toHaveBeenCalledWith('room-1');
+    expect(mockClearReconnectToken).toHaveBeenCalledWith('player-1');
+    expect(mockClearReconnectToken).toHaveBeenCalledWith('player-2');
+
+    const roomChannels = io.to.mock.results.map((result) => result.value as { emit: ReturnType<typeof vi.fn> });
+    const gameOverChannel = roomChannels[roomChannels.length - 1];
+    expect(gameOverChannel?.emit).toHaveBeenCalledWith('game_over', expectedFinalState);
+  });
+
+  it('3.1.5.5 — reconnect within grace cancels timer and emits player_reconnected', async () => {
+    const io = createIo();
+    const socket = createSocket('player-1', null);
+    const roomState = createState({
+      players: [
+        { ...createState().players[0]!, connected: false },
+        createState().players[1]!,
+      ],
+    });
+
+    mockValidateReconnectToken.mockReturnValue({
+      playerId: 'player-1',
+      socketId: null,
+      roomId: 'room-1',
+      reconnectToken: 'token-1',
+      connected: false,
+    });
+    mockRebindSession.mockReturnValue({
+      playerId: 'player-1',
+      socketId: 'player-1-socket',
+      roomId: 'room-1',
+      reconnectToken: 'token-1',
+      connected: true,
+    });
+    mockGetRoom.mockReturnValue(createRoom(roomState));
+    mockGetGameState.mockReturnValue({
+      ...roomState,
+      players: roomState.players.map((player) =>
+        player.playerId === 'player-1' ? { ...player, connected: true } : player,
+      ),
+    });
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+    await triggerReconnectAttempt(socket, { playerId: 'player-1', reconnectToken: 'token-1' });
+
+    expect(mockCancelGraceTimer).toHaveBeenCalledWith('player-1');
+    expect(socket.join).toHaveBeenCalledWith('room-1');
+
+    const updatedState = {
+      ...roomState,
+      players: roomState.players.map((player) =>
+        player.playerId === 'player-1' ? { ...player, connected: true } : player,
+      ),
+    };
+    expect(mockUpdateRoomState).toHaveBeenCalledWith('room-1', updatedState);
+
+    const roomChannels = io.to.mock.results.map((result) => result.value as { emit: ReturnType<typeof vi.fn> });
+    expect(roomChannels[0]?.emit).toHaveBeenCalledWith('game_state_update', updatedState);
+    expect(roomChannels[1]?.emit).toHaveBeenCalledWith('player_reconnected', { playerId: 'player-1' });
+
+    expect(socket.emit).toHaveBeenCalledWith('reconnect_success', expect.objectContaining({ roomId: 'room-1' }));
+  });
+
+  it('3.1.5.6 — disconnect in AI room does not start grace timer', () => {
+    const io = createIo();
+    const socket = createSocket('player-1', 'ai-player-1');
+
+    mockMarkDisconnected.mockReturnValue({
+      playerId: 'player-1',
+      socketId: null,
+      roomId: 'ai-player-1',
+      reconnectToken: null,
+      connected: false,
+    });
+    mockGetRoomByPlayerId.mockReturnValue({
+      ...createRoom(createState({ roomId: 'ai-player-1' })),
+      roomId: 'ai-player-1',
+    });
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+    triggerDisconnect(socket);
+
+    expect(mockStartGraceTimer).not.toHaveBeenCalled();
+  });
+
+  it('3.1.5.7 — disconnect with no active room does not start grace timer', () => {
+    const io = createIo();
+    const socket = createSocket('player-1', null);
+
+    mockMarkDisconnected.mockReturnValue({
+      playerId: 'player-1',
+      socketId: null,
+      roomId: null,
+      reconnectToken: null,
+      connected: false,
+    });
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+    triggerDisconnect(socket);
+
+    expect(mockStartGraceTimer).not.toHaveBeenCalled();
+  });
+
+  it('3.1.5.8 — dual disconnect expiry with no connected players resolves without winner', () => {
+    const io = createIo();
+    const socket = createSocket('player-1', 'room-1');
+    const roomState = createState({
+      players: [
+        { ...createState().players[0]!, connected: false },
+        { ...createState().players[1]!, connected: false },
+      ],
+    });
+
+    mockMarkDisconnected.mockReturnValue({
+      playerId: 'player-1',
+      socketId: null,
+      roomId: 'room-1',
+      reconnectToken: 'token-1',
+      connected: false,
+    });
+    mockGetRoomByPlayerId.mockReturnValue(createRoom(roomState));
+    mockGetRoom.mockReturnValue(createRoom(roomState));
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+    triggerDisconnect(socket);
+
+    const onExpiry = mockStartGraceTimer.mock.calls[0]?.[2] as (() => void) | undefined;
+    onExpiry?.();
+
+    const expectedFinalState = {
+      ...roomState,
+      phase: 'finished' as const,
+      outcome: {
+        type: 'draw' as const,
+        winner: null,
+        winningLine: null,
+      },
+    };
+
+    expect(mockUpdateRoomState).toHaveBeenCalledWith('room-1', expectedFinalState);
+    expect(mockMarkRoomCompleted).toHaveBeenCalledWith('room-1');
   });
 });
