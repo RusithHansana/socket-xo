@@ -53,6 +53,8 @@ export interface ServerToClientEvents {
   player_reconnected: (payload: { playerId: string }) => void;
   /** Reconnection was successful; full state snapshot provided */
   reconnect_success: (state: GameState) => void;
+  /** Newly issued reconnect token for subsequent reconnect attempts */
+  reconnect_token: (payload: { reconnectToken: string }) => void;
   /** Reconnection attempt failed */
   reconnect_failed: (payload: { code: string; message: string }) => void;
   /** A chat message was broadcast to the room */
