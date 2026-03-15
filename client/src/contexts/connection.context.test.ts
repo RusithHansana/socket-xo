@@ -53,6 +53,40 @@ describe('connectionReducer', () => {
     expect(nextState.searching).toBe(false);
   });
 
+  it('allows SET_IN_GAME from disconnected and reconnecting', () => {
+    const disconnectedState: ConnectionState = {
+      ...getInitialConnectionState(),
+      status: 'disconnected',
+    };
+    const reconnectingState: ConnectionState = {
+      ...getInitialConnectionState(),
+      status: 'reconnecting',
+    };
+
+    expect(connectionReducer(disconnectedState, { type: 'SET_IN_GAME' })).toEqual({
+      status: 'in_game',
+      searching: false,
+    });
+    expect(connectionReducer(reconnectingState, { type: 'SET_IN_GAME' })).toEqual({
+      status: 'in_game',
+      searching: false,
+    });
+  });
+
+  it('allows LEAVE_GAME transition from disconnected status', () => {
+    const disconnectedState: ConnectionState = {
+      ...getInitialConnectionState(),
+      status: 'disconnected',
+    };
+
+    const nextState = connectionReducer(disconnectedState, { type: 'LEAVE_GAME' });
+
+    expect(nextState).toEqual({
+      status: 'connected',
+      searching: false,
+    });
+  });
+
   it('ignores invalid transitions and can reset to idle', () => {
     const initial = getInitialConnectionState();
     const invalidInGame = connectionReducer(initial, { type: 'SET_IN_GAME' });

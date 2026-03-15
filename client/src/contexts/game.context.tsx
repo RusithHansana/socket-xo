@@ -22,6 +22,7 @@ export interface GameContextState {
   moveCount: number;
   lastMoveError: MoveError | null;
   opponentDisconnect: OpponentDisconnectState | null;
+  reconnectError: MoveError | null;
 }
 
 export type GameAction =
@@ -31,6 +32,7 @@ export type GameAction =
   | { type: 'MOVE_REJECTED'; payload: MoveError }
   | { type: 'OPPONENT_DISCONNECTED'; payload: OpponentDisconnectState }
   | { type: 'OPPONENT_RECONNECTED' }
+  | { type: 'RECONNECT_FAILED'; payload: MoveError }
   | { type: 'RESET' };
 
 export interface GameContextValue {
@@ -49,6 +51,7 @@ function mapGameStateToContextState(state: GameState): GameContextState {
     moveCount: state.moveCount,
     lastMoveError: null,
     opponentDisconnect: null,
+    reconnectError: null,
   };
 }
 
@@ -67,6 +70,7 @@ export function getInitialGameState(): GameContextState {
     moveCount: 0,
     lastMoveError: null,
     opponentDisconnect: null,
+    reconnectError: null,
   };
 }
 
@@ -78,7 +82,6 @@ export function gameReducer(state: GameContextState, action: GameAction): GameCo
     case 'GAME_STATE_UPDATE':
       return {
         ...mapGameStateToContextState(action.payload),
-        opponentDisconnect: state.opponentDisconnect,
       };
 
     case 'GAME_OVER':
@@ -88,6 +91,13 @@ export function gameReducer(state: GameContextState, action: GameAction): GameCo
       return {
         ...state,
         lastMoveError: action.payload,
+      };
+
+    case 'RECONNECT_FAILED':
+      return {
+        ...state,
+        reconnectError: action.payload,
+        opponentDisconnect: null,
       };
 
     case 'OPPONENT_DISCONNECTED':

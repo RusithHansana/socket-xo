@@ -1,9 +1,11 @@
 import { Suspense, useEffect } from 'react';
-import { Outlet, useMatches } from 'react-router-dom';
+import { Outlet, useLocation, useMatches, useNavigate } from 'react-router-dom';
 import { ConnectionProvider } from '../contexts/connection.provider';
 import { GameProvider } from '../contexts/game.provider';
 import { ChatProvider } from '../contexts/chat.provider';
 import { SocketProvider } from '../contexts/socket.provider';
+import { useConnectionStatus } from '../hooks/use-connection-status';
+import { useGameState } from '../hooks/use-game-state';
 import PageLoader from './page-loader';
 
 /** Runtime type guard — narrows unknown route handle to an object with a string `title`. */
@@ -14,6 +16,28 @@ function hasTitle(h: unknown): h is { title: string } {
     'title' in h &&
     typeof (h as Record<string, unknown>).title === 'string'
   );
+}
+
+function ReconnectNavigationSync() {
+  const { status } = useConnectionStatus();
+  const { roomId } = useGameState();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (status !== 'in_game' || roomId === null) {
+      return;
+    }
+
+    const roomPath = `/game/${roomId}`;
+    if (location.pathname === roomPath) {
+      return;
+    }
+
+    navigate(roomPath);
+  }, [location.pathname, navigate, roomId, status]);
+
+  return null;
 }
 
 /**
@@ -39,6 +63,7 @@ export default function RootLayout() {
       <GameProvider>
         <ChatProvider>
           <SocketProvider>
+            <ReconnectNavigationSync />
             <Suspense fallback={<PageLoader />}>
               <Outlet />
             </Suspense>

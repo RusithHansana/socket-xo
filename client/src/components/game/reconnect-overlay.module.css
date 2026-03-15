@@ -17,6 +17,10 @@
   animation: fadeOut 200ms ease-out;
 }
 
+.overlayFailed {
+  animation: fadeIn 300ms ease-out;
+}
+
 .content {
   width: min(100%, 22rem);
   display: flex;
@@ -55,6 +59,34 @@
   color: var(--color-success);
   font: var(--font-heading-lg);
   animation: welcomePulse 1s ease-out;
+}
+
+.errorHeading {
+  color: var(--color-error);
+  font: var(--font-heading-lg);
+}
+
+.errorMessage {
+  color: var(--color-text-primary);
+  font: var(--font-body-md);
+}
+
+.backButton {
+  min-height: 3rem;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-bg-surface) 90%, transparent);
+  color: var(--color-text-primary);
+  font: var(--font-body-md);
+  padding: var(--space-sm) var(--space-lg);
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.backButton:hover,
+.backButton:focus-visible {
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
 }
 
 .liveRegion {

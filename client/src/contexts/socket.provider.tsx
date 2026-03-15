@@ -23,7 +23,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     };
   }, [avatarUrl, dispatch, displayName, playerId]);
 
-  useSocketEvents(socket);
+  useSocketEvents(socket, playerId);
 
   return <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>;
 }

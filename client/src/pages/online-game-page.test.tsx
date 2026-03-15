@@ -73,6 +73,7 @@ function createState(overrides: Partial<GameContextState> = {}): GameContextStat
     moveCount: 0,
     lastMoveError: null,
     opponentDisconnect: null,
+    reconnectError: null,
     ...overrides,
   };
 }
@@ -207,6 +208,11 @@ describe('OnlineGamePage', () => {
   });
 
   it('renders reconnect overlay while disconnected mid-game', async () => {
+    mockUseGameState.mockReturnValue(
+      createState({
+        reconnectError: null,
+      }),
+    );
     mockUseConnectionStatus.mockReturnValue({
       status: 'disconnected',
       searching: false,
@@ -216,6 +222,26 @@ describe('OnlineGamePage', () => {
 
     expect(container.textContent).toContain('Reconnecting…');
     expect(container.textContent).toContain('0:30');
+  });
+
+  it('shows reconnect failure overlay state with lobby action', async () => {
+    mockUseGameState.mockReturnValue(
+      createState({
+        reconnectError: {
+          code: 'GAME_ENDED',
+          message: 'Game ended during disconnect window',
+        },
+      }),
+    );
+    mockUseConnectionStatus.mockReturnValue({
+      status: 'game_over',
+      searching: false,
+    } satisfies ConnectionState);
+
+    await renderPage();
+
+    expect(container.textContent).toContain('Connection could not be restored');
+    expect(container.textContent).toContain('Game ended during disconnect window');
   });
 
   it('renders opponent disconnect banner while waiting for opponent reconnect', async () => {

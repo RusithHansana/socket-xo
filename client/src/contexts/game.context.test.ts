@@ -42,6 +42,7 @@ describe('gameReducer', () => {
       ...baseGameState,
       lastMoveError: null,
       opponentDisconnect: null,
+      reconnectError: null,
     });
   });
 
@@ -110,10 +111,29 @@ describe('gameReducer', () => {
           playerId: 'player-o',
           gracePeriodMs: 30000,
         },
+        reconnectError: {
+          code: 'SESSION_NOT_FOUND',
+          message: 'Session missing',
+        },
       },
       { type: 'RESET' },
     );
 
     expect(resetState).toEqual(getInitialGameState());
+  });
+
+  it('stores reconnect failure error for overlay state', () => {
+    const nextState = gameReducer(getInitialGameState(), {
+      type: 'RECONNECT_FAILED',
+      payload: {
+        code: 'GAME_ENDED',
+        message: 'Game ended during disconnect',
+      },
+    });
+
+    expect(nextState.reconnectError).toEqual({
+      code: 'GAME_ENDED',
+      message: 'Game ended during disconnect',
+    });
   });
 });

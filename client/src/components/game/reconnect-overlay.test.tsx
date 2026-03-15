@@ -114,4 +114,29 @@ describe('ReconnectOverlay', () => {
 
     expect(onRecovered).toHaveBeenCalledTimes(1);
   });
+
+  it('shows reconnect failure state and calls back-to-lobby handler', () => {
+    const onBackToLobby = vi.fn();
+
+    renderOverlay({
+      failed: {
+        code: 'SESSION_NOT_FOUND',
+        message: 'Session no longer exists',
+      },
+      onBackToLobby,
+    });
+
+    expect(container.textContent).toContain('Connection could not be restored');
+    expect(container.textContent).toContain('Session no longer exists');
+
+    const button = Array.from(container.querySelectorAll('button')).find((candidate) =>
+      candidate.textContent?.includes('Back to Lobby'),
+    );
+
+    act(() => {
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onBackToLobby).toHaveBeenCalledTimes(1);
+  });
 });
