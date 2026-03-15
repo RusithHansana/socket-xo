@@ -7,6 +7,11 @@ export interface MoveError {
   message: string;
 }
 
+export interface OpponentDisconnectState {
+  playerId: string;
+  gracePeriodMs: number;
+}
+
 export interface GameContextState {
   roomId: string | null;
   board: Board;
@@ -16,6 +21,7 @@ export interface GameContextState {
   outcome: GameOutcome | null;
   moveCount: number;
   lastMoveError: MoveError | null;
+  opponentDisconnect: OpponentDisconnectState | null;
 }
 
 export type GameAction =
@@ -23,6 +29,8 @@ export type GameAction =
   | { type: 'GAME_STATE_UPDATE'; payload: GameState }
   | { type: 'GAME_OVER'; payload: GameState }
   | { type: 'MOVE_REJECTED'; payload: MoveError }
+  | { type: 'OPPONENT_DISCONNECTED'; payload: OpponentDisconnectState }
+  | { type: 'OPPONENT_RECONNECTED' }
   | { type: 'RESET' };
 
 export interface GameContextValue {
@@ -40,6 +48,7 @@ function mapGameStateToContextState(state: GameState): GameContextState {
     outcome: state.outcome,
     moveCount: state.moveCount,
     lastMoveError: null,
+    opponentDisconnect: null,
   };
 }
 
@@ -57,13 +66,21 @@ export function getInitialGameState(): GameContextState {
     outcome: null,
     moveCount: 0,
     lastMoveError: null,
+    opponentDisconnect: null,
   };
 }
 
 export function gameReducer(state: GameContextState, action: GameAction): GameContextState {
   switch (action.type) {
     case 'GAME_START':
+      return mapGameStateToContextState(action.payload);
+
     case 'GAME_STATE_UPDATE':
+      return {
+        ...mapGameStateToContextState(action.payload),
+        opponentDisconnect: state.opponentDisconnect,
+      };
+
     case 'GAME_OVER':
       return mapGameStateToContextState(action.payload);
 
@@ -71,6 +88,18 @@ export function gameReducer(state: GameContextState, action: GameAction): GameCo
       return {
         ...state,
         lastMoveError: action.payload,
+      };
+
+    case 'OPPONENT_DISCONNECTED':
+      return {
+        ...state,
+        opponentDisconnect: action.payload,
+      };
+
+    case 'OPPONENT_RECONNECTED':
+      return {
+        ...state,
+        opponentDisconnect: null,
       };
 
     case 'RESET':

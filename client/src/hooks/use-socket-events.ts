@@ -47,6 +47,14 @@ export function useSocketEvents(socket: TypedSocket | null): void {
       gameDispatch({ type: 'GAME_OVER', payload: state });
     };
 
+    const handlePlayerDisconnected = (payload: { playerId: string; gracePeriodMs: number }) => {
+      gameDispatch({ type: 'OPPONENT_DISCONNECTED', payload });
+    };
+
+    const handlePlayerReconnected = () => {
+      gameDispatch({ type: 'OPPONENT_RECONNECTED' });
+    };
+
     const handleError = (payload: { code: string; message: string }) => {
       console.error('Socket server error', payload);
     };
@@ -59,6 +67,8 @@ export function useSocketEvents(socket: TypedSocket | null): void {
     socket.on('game_state_update', handleGameStateUpdate);
     socket.on('move_rejected', handleMoveRejected);
     socket.on('game_over', handleGameOver);
+    socket.on('player_disconnected', handlePlayerDisconnected);
+    socket.on('player_reconnected', handlePlayerReconnected);
     socket.on('error', handleError);
 
     return () => {
@@ -70,6 +80,8 @@ export function useSocketEvents(socket: TypedSocket | null): void {
       socket.off('game_state_update', handleGameStateUpdate);
       socket.off('move_rejected', handleMoveRejected);
       socket.off('game_over', handleGameOver);
+      socket.off('player_disconnected', handlePlayerDisconnected);
+      socket.off('player_reconnected', handlePlayerReconnected);
       socket.off('error', handleError);
     };
   }, [connectionDispatch, gameDispatch, socket]);
