@@ -40,6 +40,9 @@ type MatchedPlayer = {
   socket: AppSocket;
 };
 
+const RECONNECT_RECOVERY_TARGET_MS = 2_000;
+const disconnectStartedAtMs = new Map<string, number>();
+
 function createOnlinePlayerInfo(socket: AppSocket, playerId: string): PlayerInfo {
   const displayName =
     typeof socket.handshake.auth.displayName === 'string'
@@ -118,10 +121,18 @@ async function handleMatchedPair(io: AppServer, initialPair: [string, string]): 
     player1.socket.data.roomId = room.roomId;
     player2.socket.data.roomId = room.roomId;
 
-    issueReconnectToken(player1.session.playerId, room.roomId);
-    issueReconnectToken(player2.session.playerId, room.roomId);
+    const player1ReconnectToken = issueReconnectToken(player1.session.playerId, room.roomId);
+    const player2ReconnectToken = issueReconnectToken(player2.session.playerId, room.roomId);
 
     io.to(room.roomId).emit('game_start', room.state);
+
+    if (player1ReconnectToken !== null) {
+      player1.socket.emit('reconnect_token', { reconnectToken: player1ReconnectToken });
+    }
+
+    if (player2ReconnectToken !== null) {
+      player2.socket.emit('reconnect_token', { reconnectToken: player2ReconnectToken });
+    }
 
     logger.debug(
       { roomId: room.roomId, player1Id, player2Id },
@@ -349,6 +360,7 @@ export function registerSocketHandlers(
 
           for (const playerId of room.playerIds) {
             clearReconnectToken(playerId);
+            disconnectStartedAtMs.delete(playerId);
           }
         }
 
@@ -424,47 +436,84 @@ export function registerSocketHandlers(
           return;
         }
 
-        clearReconnectToken(payload.playerId);
-        socket.data.roomId = reboundSession.roomId;
-
-        cancelGraceTimer(payload.playerId);
-
-        if (reboundSession.roomId !== null) {
-          await socket.join(reboundSession.roomId);
-
-          const room = getRoom(reboundSession.roomId);
-
-          if (room !== null && room.status === 'active' && !reboundSession.roomId.startsWith('ai-')) {
-            const updatedState = {
-              ...room.state,
-              players: room.state.players.map((player) =>
-                player.playerId === payload.playerId
-                  ? { ...player, connected: true }
-                  : player,
-              ),
-            };
-
-            updateRoomState(reboundSession.roomId, updatedState);
-            io.to(reboundSession.roomId).emit('game_state_update', updatedState);
-            io.to(reboundSession.roomId).emit('player_reconnected', { playerId: payload.playerId });
-          }
-        }
-
-        const roomState =
-          reboundSession.roomId === null ? null : getGameState(reboundSession.roomId);
-
-        if (roomState === null) {
+        if (reboundSession.roomId === null || reboundSession.roomId.startsWith('ai-')) {
           socket.emit('reconnect_failed', {
-            code: 'ROOM_NOT_FOUND',
-            message: 'No active game state was found for this reconnecting session.',
+            code: 'GAME_ENDED',
+            message: 'The game has already ended.',
           });
+          clearReconnectToken(payload.playerId);
+          disconnectStartedAtMs.delete(payload.playerId);
+          socket.data.roomId = null;
           return;
         }
 
+        const room = getRoom(reboundSession.roomId);
+
+        if (room === null || room.status !== 'active') {
+          socket.emit('reconnect_failed', {
+            code: 'GAME_ENDED',
+            message: 'The game has already ended.',
+          });
+          clearReconnectToken(payload.playerId);
+          disconnectStartedAtMs.delete(payload.playerId);
+          socket.data.roomId = null;
+          return;
+        }
+
+        clearReconnectToken(payload.playerId);
+        socket.data.roomId = reboundSession.roomId;
+        await socket.join(reboundSession.roomId);
+
+        const updatedState = {
+          ...room.state,
+          players: room.state.players.map((player) =>
+            player.playerId === payload.playerId
+              ? { ...player, connected: true }
+              : player,
+          ),
+        };
+
+        updateRoomState(reboundSession.roomId, updatedState);
+
+        const roomState = getGameState(reboundSession.roomId);
+
+        if (roomState === null) {
+          socket.emit('reconnect_failed', {
+            code: 'GAME_ENDED',
+            message: 'The game has already ended.',
+          });
+          disconnectStartedAtMs.delete(payload.playerId);
+          socket.data.roomId = null;
+          return;
+        }
+
+        cancelGraceTimer(payload.playerId);
+        io.to(reboundSession.roomId).emit('game_state_update', updatedState);
+        io.to(reboundSession.roomId).emit('player_reconnected', { playerId: payload.playerId });
+
         socket.emit('reconnect_success', roomState);
 
+        const newReconnectToken = issueReconnectToken(payload.playerId, reboundSession.roomId);
+        if (newReconnectToken !== null) {
+          socket.emit('reconnect_token', { reconnectToken: newReconnectToken });
+        }
+
+        const disconnectStartedAt = disconnectStartedAtMs.get(payload.playerId);
+        const reconnectLatencyMs =
+          disconnectStartedAt === undefined ? null : Math.max(0, Date.now() - disconnectStartedAt);
+        const recoveryTargetMet =
+          reconnectLatencyMs === null ? null : reconnectLatencyMs <= RECONNECT_RECOVERY_TARGET_MS;
+        disconnectStartedAtMs.delete(payload.playerId);
+
         logger.debug(
-          { playerId: payload.playerId, socketId: socket.id, roomId: reboundSession.roomId },
+          {
+            playerId: payload.playerId,
+            socketId: socket.id,
+            roomId: reboundSession.roomId,
+            reconnectLatencyMs,
+            reconnectLatencyTargetMs: RECONNECT_RECOVERY_TARGET_MS,
+            recoveryTargetMet,
+          },
           'reconnect_attempt succeeded',
         );
       } catch (err) {
@@ -550,6 +599,8 @@ export function registerSocketHandlers(
               gracePeriodMs: config.gracePeriodMs,
             });
 
+            disconnectStartedAtMs.set(session.playerId, Date.now());
+
             startGraceTimer(session.playerId, config.gracePeriodMs, () => {
               try {
                 const activeRoom = getRoom(room.roomId);
@@ -579,6 +630,7 @@ export function registerSocketHandlers(
 
                 for (const playerId of activeRoom.playerIds) {
                   clearReconnectToken(playerId);
+                  disconnectStartedAtMs.delete(playerId);
                 }
               } catch (err) {
                 logger.error(

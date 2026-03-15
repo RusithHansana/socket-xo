@@ -27,6 +27,8 @@ const {
   mockIsAiGame,
   mockStartGraceTimer,
   mockCancelGraceTimer,
+  mockLoggerDebug,
+  mockLoggerError,
 } = vi.hoisted(() => ({
   mockGetRoom: vi.fn(),
   mockGetGameState: vi.fn(),
@@ -53,6 +55,8 @@ const {
   mockIsAiGame: vi.fn(),
   mockStartGraceTimer: vi.fn(),
   mockCancelGraceTimer: vi.fn(),
+  mockLoggerDebug: vi.fn(),
+  mockLoggerError: vi.fn(),
 }));
 
 vi.mock('./room/room-manager.js', () => ({
@@ -106,8 +110,8 @@ vi.mock('./game/ai-game-handler.js', () => ({
 
 vi.mock('./utils/logger.js', () => ({
   logger: {
-    debug: vi.fn(),
-    error: vi.fn(),
+    debug: mockLoggerDebug,
+    error: mockLoggerError,
   },
 }));
 
@@ -245,6 +249,16 @@ async function triggerReconnectAttempt(
   }
 
   await handler(payload);
+}
+
+async function triggerJoinQueue(socket: MockSocket): Promise<void> {
+  const handler = socket.listeners.get('join_queue');
+
+  if (handler === undefined) {
+    throw new Error('Expected join_queue handler to be registered.');
+  }
+
+  await handler();
 }
 
 function expectRoomBroadcast(io: MockServer, roomId: string, eventName: string, payload: unknown): void {
@@ -433,10 +447,57 @@ describe('registerSocketHandlers make_move (online)', () => {
   });
 });
 
+describe('registerSocketHandlers matchmaking reconnect token delivery', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockIssueReconnectToken.mockReset();
+    mockIsAiGame.mockReturnValue(false);
+    mockGetRoomByPlayerId.mockReturnValue(null);
+    mockAddToQueue.mockReturnValue(true);
+    mockTryMatchPair.mockReturnValue(['player-1', 'player-2']);
+    mockCreateRoom.mockReturnValue(createRoom(createState()));
+    mockIssueReconnectToken
+      .mockReturnValueOnce('token-player-1')
+      .mockReturnValueOnce('token-player-2');
+    mockRegisterSession.mockImplementation((playerId: string, socketId: string) => ({
+      playerId,
+      socketId,
+      roomId: null,
+      reconnectToken: null,
+      connected: true,
+    }));
+    mockGetSession.mockImplementation((playerId: string) => ({
+      playerId,
+      socketId: `${playerId}-socket`,
+      roomId: null,
+      reconnectToken: null,
+      connected: true,
+    }));
+  });
+
+  it('3.2.4.5 — emits reconnect_token to both players when online game starts', async () => {
+    const io = createIo();
+    const player1 = createSocket('player-1', null);
+    const player2 = createSocket('player-2', null);
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, player1);
+    connectSocket(io, player2);
+
+    await triggerJoinQueue(player1);
+
+    expect(player1.emit).toHaveBeenCalledWith('queue_joined');
+    expect(player1.emit).toHaveBeenCalledWith('reconnect_token', { reconnectToken: 'token-player-1' });
+    expect(player2.emit).toHaveBeenCalledWith('reconnect_token', { reconnectToken: 'token-player-2' });
+  });
+});
+
 describe('registerSocketHandlers disconnect/reconnect grace flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    mockIssueReconnectToken.mockReset();
     mockIsAiGame.mockReturnValue(false);
     mockGetRoomByPlayerId.mockReturnValue(null);
     mockTryMatchPair.mockReturnValue(null);
@@ -561,6 +622,7 @@ describe('registerSocketHandlers disconnect/reconnect grace flow', () => {
       reconnectToken: 'token-1',
       connected: true,
     });
+    mockIssueReconnectToken.mockReturnValue('token-2');
     mockGetRoom.mockReturnValue(createRoom(roomState));
     mockGetGameState.mockReturnValue({
       ...roomState,
@@ -574,6 +636,7 @@ describe('registerSocketHandlers disconnect/reconnect grace flow', () => {
     await triggerReconnectAttempt(socket, { playerId: 'player-1', reconnectToken: 'token-1' });
 
     expect(mockCancelGraceTimer).toHaveBeenCalledWith('player-1');
+  expect(mockIssueReconnectToken).toHaveBeenCalledWith('player-1', 'room-1');
     expect(socket.join).toHaveBeenCalledWith('room-1');
 
     const updatedState = {
@@ -589,6 +652,213 @@ describe('registerSocketHandlers disconnect/reconnect grace flow', () => {
     expect(roomChannels[1]?.emit).toHaveBeenCalledWith('player_reconnected', { playerId: 'player-1' });
 
     expect(socket.emit).toHaveBeenCalledWith('reconnect_success', expect.objectContaining({ roomId: 'room-1' }));
+    expect(socket.emit).toHaveBeenCalledWith('reconnect_token', { reconnectToken: 'token-2' });
+  });
+
+  it('3.2.2.3 — reconnect after grace expiry emits GAME_ENDED and keeps grace timer unaffected', async () => {
+    const io = createIo();
+    const socket = createSocket('player-1', null);
+
+    mockValidateReconnectToken.mockReturnValue({
+      playerId: 'player-1',
+      socketId: null,
+      roomId: 'room-1',
+      reconnectToken: 'token-1',
+      connected: false,
+    });
+    mockRebindSession.mockReturnValue({
+      playerId: 'player-1',
+      socketId: 'player-1-socket',
+      roomId: 'room-1',
+      reconnectToken: 'token-1',
+      connected: true,
+    });
+    mockGetRoom.mockReturnValue({
+      ...createRoom(createState()),
+      status: 'completed',
+    });
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+    await triggerReconnectAttempt(socket, { playerId: 'player-1', reconnectToken: 'token-1' });
+
+    expect(socket.emit).toHaveBeenCalledWith('reconnect_failed', {
+      code: 'GAME_ENDED',
+      message: 'The game has already ended.',
+    });
+    expect(mockCancelGraceTimer).not.toHaveBeenCalled();
+    expect(mockIssueReconnectToken).not.toHaveBeenCalled();
+  });
+
+  it('3.2.3.1 — invalid reconnect token does not cancel grace timer', async () => {
+    const io = createIo();
+    const socket = createSocket('player-1', null);
+
+    mockValidateReconnectToken.mockReturnValue(null);
+    mockGetSession.mockReturnValue({
+      playerId: 'player-1',
+      socketId: null,
+      roomId: 'room-1',
+      reconnectToken: 'token-expected',
+      connected: false,
+    });
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+    await triggerReconnectAttempt(socket, { playerId: 'player-1', reconnectToken: 'token-invalid' });
+
+    expect(socket.emit).toHaveBeenCalledWith('reconnect_failed', {
+      code: 'INVALID_TOKEN',
+      message: 'The reconnect token is invalid for this player session.',
+    });
+    expect(mockCancelGraceTimer).not.toHaveBeenCalled();
+  });
+
+  it('3.2.3.2 — logs reconnect recovery latency and target compliance on successful reconnect', async () => {
+    const io = createIo();
+    const disconnectingSocket = createSocket('player-1', 'room-1');
+    const reconnectSocket = createSocket('player-1', null);
+    const roomState = createState({
+      players: [
+        { ...createState().players[0]!, connected: false },
+        createState().players[1]!,
+      ],
+    });
+
+    mockMarkDisconnected.mockReturnValue({
+      playerId: 'player-1',
+      socketId: null,
+      roomId: 'room-1',
+      reconnectToken: 'token-1',
+      connected: false,
+    });
+    mockGetRoomByPlayerId.mockReturnValue(createRoom(roomState));
+    mockValidateReconnectToken.mockReturnValue({
+      playerId: 'player-1',
+      socketId: null,
+      roomId: 'room-1',
+      reconnectToken: 'token-1',
+      connected: false,
+    });
+    mockRebindSession.mockReturnValue({
+      playerId: 'player-1',
+      socketId: 'player-1-socket',
+      roomId: 'room-1',
+      reconnectToken: 'token-1',
+      connected: true,
+    });
+    mockGetRoom.mockReturnValue(createRoom(roomState));
+    mockGetGameState.mockReturnValue({
+      ...roomState,
+      players: roomState.players.map((player) =>
+        player.playerId === 'player-1' ? { ...player, connected: true } : player,
+      ),
+    });
+    mockIssueReconnectToken.mockReturnValue('token-2');
+
+    const nowSpy = vi.spyOn(Date, 'now');
+    nowSpy
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(2_500);
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, disconnectingSocket);
+    triggerDisconnect(disconnectingSocket);
+
+    connectSocket(io, reconnectSocket);
+    await triggerReconnectAttempt(reconnectSocket, { playerId: 'player-1', reconnectToken: 'token-1' });
+
+    expect(mockLoggerDebug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playerId: 'player-1',
+        reconnectLatencyMs: 1_500,
+        reconnectLatencyTargetMs: 2_000,
+        recoveryTargetMet: true,
+      }),
+      'reconnect_attempt succeeded',
+    );
+
+    nowSpy.mockRestore();
+  });
+
+  it('3.2.5.4 — multi-cycle reconnect re-issues a fresh token each successful cycle', async () => {
+    const io = createIo();
+    const socket = createSocket('player-1', null);
+    const roomState = createState({
+      players: [
+        { ...createState().players[0]!, connected: false },
+        createState().players[1]!,
+      ],
+    });
+
+    mockValidateReconnectToken
+      .mockReturnValueOnce({
+        playerId: 'player-1',
+        socketId: null,
+        roomId: 'room-1',
+        reconnectToken: 'token-1',
+        connected: false,
+      })
+      .mockReturnValueOnce({
+        playerId: 'player-1',
+        socketId: null,
+        roomId: 'room-1',
+        reconnectToken: 'token-2',
+        connected: false,
+      });
+    mockRebindSession
+      .mockReturnValueOnce({
+        playerId: 'player-1',
+        socketId: 'player-1-socket',
+        roomId: 'room-1',
+        reconnectToken: 'token-1',
+        connected: true,
+      })
+      .mockReturnValueOnce({
+        playerId: 'player-1',
+        socketId: 'player-1-socket',
+        roomId: 'room-1',
+        reconnectToken: 'token-2',
+        connected: true,
+      });
+    mockGetRoom.mockReturnValue(createRoom(roomState));
+    mockGetGameState.mockReturnValue({
+      ...roomState,
+      players: roomState.players.map((player) =>
+        player.playerId === 'player-1' ? { ...player, connected: true } : player,
+      ),
+    });
+    mockIssueReconnectToken
+      .mockReturnValueOnce('token-2')
+      .mockReturnValueOnce('token-3');
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+
+    await triggerReconnectAttempt(socket, { playerId: 'player-1', reconnectToken: 'token-1' });
+    await triggerReconnectAttempt(socket, { playerId: 'player-1', reconnectToken: 'token-2' });
+
+    expect(mockIssueReconnectToken).toHaveBeenNthCalledWith(1, 'player-1', 'room-1');
+    expect(mockIssueReconnectToken).toHaveBeenNthCalledWith(2, 'player-1', 'room-1');
+    expect(socket.emit).toHaveBeenCalledWith('reconnect_token', { reconnectToken: 'token-2' });
+    expect(socket.emit).toHaveBeenCalledWith('reconnect_token', { reconnectToken: 'token-3' });
+  });
+
+  it('3.2.5.6 — reconnect attempt for AI session is rejected when no token exists', async () => {
+    const io = createIo();
+    const socket = createSocket('player-1', null);
+
+    mockValidateReconnectToken.mockReturnValue(null);
+    mockGetSession.mockReturnValue(null);
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+    await triggerReconnectAttempt(socket, { playerId: 'player-1', reconnectToken: 'ai-token' });
+
+    expect(socket.emit).toHaveBeenCalledWith('reconnect_failed', {
+      code: 'SESSION_NOT_FOUND',
+      message: 'No reconnectable session was found for this player.',
+    });
   });
 
   it('3.1.5.6 — disconnect in AI room does not start grace timer', () => {
