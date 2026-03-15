@@ -1,0 +1,71 @@
+.container {
+  position: sticky;
+  top: var(--space-md);
+  z-index: 50;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 55%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-warning) 16%, var(--color-bg-secondary));
+  box-shadow: var(--shadow-card);
+}
+
+.indicatorWrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.indicator {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: var(--radius-full);
+}
+
+.indicatorWaiting {
+  background: var(--color-warning);
+  box-shadow: 0 0 0.625rem color-mix(in srgb, var(--color-warning) 60%, transparent);
+  animation: pulse 900ms ease-out infinite;
+}
+
+.indicatorRecovered {
+  background: var(--color-success);
+  box-shadow: 0 0 0.625rem color-mix(in srgb, var(--color-success) 60%, transparent);
+}
+
+.message {
+  margin: 0;
+  color: var(--color-text-primary);
+  font: var(--font-body-sm);
+}
+
+.timer {
+  color: var(--color-warning);
+  font: var(--font-body-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.timerCritical {
+  color: var(--color-error);
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+
+  50% {
+    transform: scale(1.16);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+}

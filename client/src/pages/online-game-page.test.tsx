@@ -72,6 +72,7 @@ function createState(overrides: Partial<GameContextState> = {}): GameContextStat
     outcome: null,
     moveCount: 0,
     lastMoveError: null,
+    opponentDisconnect: null,
     ...overrides,
   };
 }
@@ -214,6 +215,22 @@ describe('OnlineGamePage', () => {
     await renderPage();
 
     expect(container.textContent).toContain('Reconnecting…');
+    expect(container.textContent).toContain('0:30');
+  });
+
+  it('renders opponent disconnect banner while waiting for opponent reconnect', async () => {
+    mockUseGameState.mockReturnValue(
+      createState({
+        opponentDisconnect: {
+          playerId: 'player-2',
+          gracePeriodMs: 30000,
+        },
+      }),
+    );
+
+    await renderPage();
+
+    expect(container.textContent).toContain('Opponent disconnected');
     expect(container.textContent).toContain('0:30');
   });
 

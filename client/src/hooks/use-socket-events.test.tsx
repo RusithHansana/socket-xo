@@ -124,6 +124,8 @@ describe('useSocketEvents', () => {
     handlers.get('game_start')?.(sampleGameState);
     handlers.get('game_state_update')?.(sampleGameState);
     handlers.get('move_rejected')?.({ code: 'CELL_TAKEN', message: 'Cell already occupied' });
+    handlers.get('player_disconnected')?.({ playerId: 'player-o', gracePeriodMs: 30000 });
+    handlers.get('player_reconnected')?.({ playerId: 'player-o' });
     handlers.get('game_over')?.({
       ...sampleGameState,
       phase: 'finished',
@@ -147,6 +149,13 @@ describe('useSocketEvents', () => {
     expect(gameDispatch).toHaveBeenCalledWith({
       type: 'MOVE_REJECTED',
       payload: { code: 'CELL_TAKEN', message: 'Cell already occupied' },
+    });
+    expect(gameDispatch).toHaveBeenCalledWith({
+      type: 'OPPONENT_DISCONNECTED',
+      payload: { playerId: 'player-o', gracePeriodMs: 30000 },
+    });
+    expect(gameDispatch).toHaveBeenCalledWith({
+      type: 'OPPONENT_RECONNECTED',
     });
   });
 
@@ -185,6 +194,8 @@ describe('useSocketEvents', () => {
         'game_start',
         'game_state_update',
         'move_rejected',
+        'player_disconnected',
+        'player_reconnected',
         'game_over',
         'error',
       ]),

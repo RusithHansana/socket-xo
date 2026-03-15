@@ -41,6 +41,7 @@ describe('gameReducer', () => {
     expect(nextState).toEqual({
       ...baseGameState,
       lastMoveError: null,
+      opponentDisconnect: null,
     });
   });
 
@@ -62,6 +63,42 @@ describe('gameReducer', () => {
     expect(rejectedState.roomId).toBe(baseGameState.roomId);
   });
 
+  it('stores opponent disconnect payload and clears it on reconnect', () => {
+    const disconnectedState = gameReducer(getInitialGameState(), {
+      type: 'OPPONENT_DISCONNECTED',
+      payload: { playerId: 'player-o', gracePeriodMs: 30000 },
+    });
+
+    expect(disconnectedState.opponentDisconnect).toEqual({
+      playerId: 'player-o',
+      gracePeriodMs: 30000,
+    });
+
+    const reconnectedState = gameReducer(disconnectedState, {
+      type: 'OPPONENT_RECONNECTED',
+    });
+
+    expect(reconnectedState.opponentDisconnect).toBeNull();
+  });
+
+  it('clears opponent disconnect state when game over snapshot arrives', () => {
+    const disconnectedState = gameReducer(getInitialGameState(), {
+      type: 'OPPONENT_DISCONNECTED',
+      payload: { playerId: 'player-o', gracePeriodMs: 30000 },
+    });
+
+    const gameOverState = gameReducer(disconnectedState, {
+      type: 'GAME_OVER',
+      payload: {
+        ...baseGameState,
+        phase: 'finished',
+        outcome: { type: 'draw' },
+      },
+    });
+
+    expect(gameOverState.opponentDisconnect).toBeNull();
+  });
+
   it('resets state back to the initial empty snapshot', () => {
     const resetState = gameReducer(
       {
@@ -69,6 +106,10 @@ describe('gameReducer', () => {
         roomId: 'room-123',
         moveCount: 4,
         lastMoveError: { code: 'INVALID', message: 'Invalid move' },
+        opponentDisconnect: {
+          playerId: 'player-o',
+          gracePeriodMs: 30000,
+        },
       },
       { type: 'RESET' },
     );

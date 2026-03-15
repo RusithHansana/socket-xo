@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { GRACE_PERIOD_MS, type PlayerInfo, type Symbol } from 'shared';
 import { useLoaderData, useNavigate } from 'react-router-dom';
 import { GameBoard } from '../components/game/game-board';
+import { OpponentDisconnectBanner } from '../components/game/opponent-disconnect-banner';
 import { GameOutcomeModal } from '../components/game/game-outcome-modal';
 import { PlayerIdentity } from '../components/game/player-identity';
 import { ReconnectOverlay } from '../components/game/reconnect-overlay';
@@ -55,7 +56,27 @@ export default function OnlineGamePage() {
   const gameDispatch = useGameDispatch();
   const connectionDispatch = useConnectionDispatch();
   const [showRecoveredOverlay, setShowRecoveredOverlay] = useState(false);
+  const [showReconnectedBanner, setShowReconnectedBanner] = useState(false);
   const previousStatusRef = useRef(status);
+  const previousOpponentDisconnectRef = useRef(gameState.opponentDisconnect);
+
+  useEffect(() => {
+    const previousOpponentDisconnect = previousOpponentDisconnectRef.current;
+
+    if (gameState.opponentDisconnect === null && previousOpponentDisconnect !== null && gameState.outcome === null) {
+      setShowReconnectedBanner(true);
+    }
+
+    if (gameState.opponentDisconnect !== null) {
+      setShowReconnectedBanner(false);
+    }
+
+    if (gameState.outcome !== null) {
+      setShowReconnectedBanner(false);
+    }
+
+    previousOpponentDisconnectRef.current = gameState.opponentDisconnect;
+  }, [gameState.opponentDisconnect, gameState.outcome]);
 
   useEffect(() => {
     const previousStatus = previousStatusRef.current;
@@ -133,6 +154,8 @@ export default function OnlineGamePage() {
   const showDisconnectedOverlay = status === 'disconnected' && gameState.phase === 'playing';
   const showReconnectSuccessOverlay =
     showRecoveredOverlay && gameState.phase === 'playing' && gameState.outcome === null;
+  const showOpponentDisconnectBanner =
+    gameState.outcome === null && (gameState.opponentDisconnect !== null || showReconnectedBanner);
 
   return (
     <main className={styles.page}>
@@ -157,6 +180,14 @@ export default function OnlineGamePage() {
         </section>
 
         <section className={styles.gamePanel}>
+          {showOpponentDisconnectBanner ? (
+            <OpponentDisconnectBanner
+              gracePeriodMs={gameState.opponentDisconnect?.gracePeriodMs ?? GRACE_PERIOD_MS}
+              reconnected={gameState.opponentDisconnect === null && showReconnectedBanner}
+              onReconnected={() => setShowReconnectedBanner(false)}
+            />
+          ) : null}
+
           <TurnIndicator currentTurn={gameState.currentTurn} mySymbol={mySymbol} />
           <div className={styles.boardFrame}>
             <GameBoard
