@@ -94,6 +94,16 @@ export function gameReducer(state: GameContextState, action: GameAction): GameCo
       };
 
     case 'RECONNECT_FAILED':
+      if (
+        action.payload.code === 'INVALID_TOKEN'
+        || action.payload.code === 'SESSION_NOT_FOUND'
+      ) {
+        return {
+          ...getInitialGameState(),
+          reconnectError: action.payload,
+        };
+      }
+
       return {
         ...state,
         reconnectError: action.payload,
