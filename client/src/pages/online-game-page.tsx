@@ -58,17 +58,17 @@ export default function OnlineGamePage() {
   const connectionDispatch = useConnectionDispatch();
   const [showRecoveredOverlay, setShowRecoveredOverlay] = useState(false);
   const [showReconnectedBanner, setShowReconnectedBanner] = useState(false);
-  const [joinAttempted, setJoinAttempted] = useState(false);
+  const joinAttemptedRef = useRef(false);
   const [copyLabel, setCopyLabel] = useState<'copy' | 'copied' | 'failed'>('copy');
   const previousStatusRef = useRef(status);
   const previousOpponentDisconnectRef = useRef(gameState.opponentDisconnect);
 
   useEffect(() => {
-    setJoinAttempted(false);
+    joinAttemptedRef.current = false;
   }, [roomId]);
 
   useEffect(() => {
-    if (socket === null || roomId.length === 0 || status !== 'connected' || joinAttempted) {
+    if (socket === null || roomId.length === 0 || status !== 'connected' || joinAttemptedRef.current) {
       return;
     }
 
@@ -81,8 +81,8 @@ export default function OnlineGamePage() {
     }
 
     socket.emit('join_room', { roomId, playerId });
-    setJoinAttempted(true);
-  }, [gameState.roomId, joinAttempted, playerId, roomId, socket, status]);
+    joinAttemptedRef.current = true;
+  }, [gameState.roomId, playerId, roomId, socket, status]);
 
   useEffect(() => {
     const previousOpponentDisconnect = previousOpponentDisconnectRef.current;
