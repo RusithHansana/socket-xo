@@ -13,7 +13,7 @@ import { useGameDispatch } from '../hooks/use-game-dispatch';
 import { useGameState } from '../hooks/use-game-state';
 import { useGuestIdentity } from '../hooks/use-guest-identity';
 import { useSocket } from '../hooks/use-socket';
-import { clearReconnectToken } from '../services/reconnect-token-service';
+import { clearReconnectToken, getReconnectToken } from '../services/reconnect-token-service';
 
 /** The resolved success payload from onlineGamePageLoader (redirect path never reaches the component). */
 type LoaderData = { roomId: string };
@@ -58,8 +58,31 @@ export default function OnlineGamePage() {
   const connectionDispatch = useConnectionDispatch();
   const [showRecoveredOverlay, setShowRecoveredOverlay] = useState(false);
   const [showReconnectedBanner, setShowReconnectedBanner] = useState(false);
+  const [joinAttempted, setJoinAttempted] = useState(false);
+  const [copyLabel, setCopyLabel] = useState<'copy' | 'copied' | 'failed'>('copy');
   const previousStatusRef = useRef(status);
   const previousOpponentDisconnectRef = useRef(gameState.opponentDisconnect);
+
+  useEffect(() => {
+    setJoinAttempted(false);
+  }, [roomId]);
+
+  useEffect(() => {
+    if (socket === null || roomId.length === 0 || status !== 'connected' || joinAttempted) {
+      return;
+    }
+
+    if (gameState.roomId === roomId) {
+      return;
+    }
+
+    if (getReconnectToken(playerId) !== null) {
+      return;
+    }
+
+    socket.emit('join_room', { roomId, playerId });
+    setJoinAttempted(true);
+  }, [gameState.roomId, joinAttempted, playerId, roomId, socket, status]);
 
   useEffect(() => {
     const previousOpponentDisconnect = previousOpponentDisconnectRef.current;
@@ -132,7 +155,74 @@ export default function OnlineGamePage() {
     socket.emit('make_move', { roomId: activeRoomId, position: { row, col } });
   };
 
-  const isLoading = gameState.phase === 'waiting' || status === 'idle' || status === 'connecting';
+  const handleCopyLink = async () => {
+    if (activeRoomId.length === 0) {
+      return;
+    }
+
+    const roomLink = `${window.location.origin}/game/${activeRoomId}`;
+
+    try {
+      await navigator.clipboard.writeText(roomLink);
+      setCopyLabel('copied');
+    } catch {
+      setCopyLabel('failed');
+    }
+  };
+
+  const roomLink = activeRoomId.length > 0 ? `${window.location.origin}/game/${activeRoomId}` : '';
+  const isLoading = status === 'idle' || status === 'connecting';
+  const isWaitingForOpponent = gameState.phase === 'waiting' && activeRoomId.length > 0;
+
+  if (gameState.roomError !== null) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.shell}>
+          <section className={styles.errorCard} aria-live="assertive">
+            <p className={styles.loadingEyebrow}>Room unavailable</p>
+            <h1 className={styles.loadingTitle}>{gameState.roomError.message}</h1>
+            <button type="button" onClick={handleBackToLobby} className={styles.primaryButton}>
+              Go to Lobby
+            </button>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (isWaitingForOpponent) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.shell}>
+          <button type="button" onClick={handleBackToLobby} className={styles.backButton}>
+            Back to Lobby
+          </button>
+          <section className={styles.waitingCard} aria-live="polite" aria-atomic="true">
+            <p className={styles.loadingEyebrow}>Room created</p>
+            <h1 className={styles.loadingTitle}>Waiting for opponent</h1>
+            <p className={styles.loadingText}>Share this link to invite a friend.</p>
+
+            <div className={styles.linkRow}>
+              <p className={styles.linkText}>{roomLink}</p>
+              <button type="button" onClick={handleCopyLink} className={styles.secondaryButton}>
+                {copyLabel === 'copy' ? 'Copy Link' : copyLabel === 'copied' ? 'Copied' : 'Copy Failed'}
+              </button>
+            </div>
+
+            <section className={styles.playerGrid} aria-label="Player identities">
+              <PlayerIdentity player={fallbackMe} isActive />
+            </section>
+
+            <div className={styles.waitingDots} aria-hidden="true">
+              <span className={styles.dot} />
+              <span className={styles.dot} />
+              <span className={styles.dot} />
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   if (isLoading) {
     return (

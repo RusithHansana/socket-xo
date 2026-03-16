@@ -9,6 +9,8 @@ import {
   storeReconnectToken,
 } from '../services/reconnect-token-service';
 
+const ROOM_ERROR_CODES = new Set(['ROOM_NOT_FOUND', 'ROOM_FULL', 'GAME_ENDED', 'ALREADY_IN_GAME']);
+
 export function useSocketEvents(socket: TypedSocket | null, playerId: string): void {
   const connectionDispatch = useConnectionDispatch();
   const gameDispatch = useGameDispatch();
@@ -55,6 +57,11 @@ export function useSocketEvents(socket: TypedSocket | null, playerId: string): v
       gameDispatch({ type: 'MOVE_REJECTED', payload });
     };
 
+    const handleRoomCreated = (payload: { roomId: string }) => {
+      gameDispatch({ type: 'ROOM_CREATED', payload });
+      connectionDispatch({ type: 'SET_IN_GAME' });
+    };
+
     const handleGameOver = (state: GameState) => {
       clearReconnectToken(playerId);
       connectionDispatch({ type: 'SET_GAME_OVER' });
@@ -86,6 +93,10 @@ export function useSocketEvents(socket: TypedSocket | null, playerId: string): v
     };
 
     const handleError = (payload: { code: string; message: string }) => {
+      if (ROOM_ERROR_CODES.has(payload.code)) {
+        gameDispatch({ type: 'SET_ROOM_ERROR', payload });
+      }
+
       console.error('Socket server error', payload);
     };
 
@@ -96,6 +107,7 @@ export function useSocketEvents(socket: TypedSocket | null, playerId: string): v
     socket.on('game_start', handleGameStart);
     socket.on('game_state_update', handleGameStateUpdate);
     socket.on('move_rejected', handleMoveRejected);
+    socket.on('room_created', handleRoomCreated);
     socket.on('game_over', handleGameOver);
     socket.on('player_disconnected', handlePlayerDisconnected);
     socket.on('player_reconnected', handlePlayerReconnected);
@@ -112,6 +124,7 @@ export function useSocketEvents(socket: TypedSocket | null, playerId: string): v
       socket.off('game_start', handleGameStart);
       socket.off('game_state_update', handleGameStateUpdate);
       socket.off('move_rejected', handleMoveRejected);
+      socket.off('room_created', handleRoomCreated);
       socket.off('game_over', handleGameOver);
       socket.off('player_disconnected', handlePlayerDisconnected);
       socket.off('player_reconnected', handlePlayerReconnected);

@@ -41,6 +41,21 @@ function AiIcon() {
   );
 }
 
+function LinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className={styles.cardIcon} focusable="false" aria-hidden="true">
+      <path
+        d="M10 13.5 14 9.5m-5.5 6a3.5 3.5 0 0 1 0-5l2-2a3.5 3.5 0 1 1 5 5l-.75.75m-5 5-.75.75a3.5 3.5 0 1 1-5-5l2-2a3.5 3.5 0 0 1 5 0"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
 export default function LobbyPage() {
   const navigate = useNavigate();
   const { displayName, avatarUrl } = useGuestIdentity();
@@ -88,6 +103,12 @@ export default function LobbyPage() {
     }
 
     connectionDispatch({ type: 'CLEAR_SEARCHING' });
+  };
+
+  const handleCreateRoom = () => {
+    if (socket !== null) {
+      socket.emit('create_room');
+    }
   };
 
   return (
@@ -142,6 +163,13 @@ export default function LobbyPage() {
                 onClick={() => {
                   navigate('/ai');
                 }}
+                loading={isLoading}
+              />
+              <LobbyCard
+                title="Create Room"
+                description="Create a private room and invite a friend with a link."
+                icon={<LinkIcon />}
+                onClick={handleCreateRoom}
                 loading={isLoading}
               />
             </>

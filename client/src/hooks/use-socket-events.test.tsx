@@ -138,6 +138,7 @@ describe('useSocketEvents', () => {
     handlers.get('game_start')?.(sampleGameState);
     handlers.get('game_state_update')?.(sampleGameState);
     handlers.get('move_rejected')?.({ code: 'CELL_TAKEN', message: 'Cell already occupied' });
+    handlers.get('room_created')?.({ roomId: 'room-created-1' });
     handlers.get('player_disconnected')?.({ playerId: 'player-o', gracePeriodMs: 30000 });
     handlers.get('player_reconnected')?.({ playerId: 'player-o' });
     handlers.get('reconnect_token')?.({ reconnectToken: 'token-1' });
@@ -163,6 +164,10 @@ describe('useSocketEvents', () => {
     expect(connectionDispatch).toHaveBeenCalledWith({ type: 'SET_GAME_OVER' });
     expect(gameDispatch).toHaveBeenCalledWith({ type: 'GAME_START', payload: sampleGameState });
     expect(gameDispatch).toHaveBeenCalledWith({ type: 'GAME_STATE_UPDATE', payload: sampleGameState });
+    expect(gameDispatch).toHaveBeenCalledWith({
+      type: 'ROOM_CREATED',
+      payload: { roomId: 'room-created-1' },
+    });
     expect(gameDispatch).toHaveBeenCalledWith({
       type: 'MOVE_REJECTED',
       payload: { code: 'CELL_TAKEN', message: 'Cell already occupied' },
@@ -260,6 +265,7 @@ describe('useSocketEvents', () => {
         'disconnect',
         'connect_error',
         'queue_joined',
+        'room_created',
         'game_start',
         'game_state_update',
         'move_rejected',
@@ -271,6 +277,56 @@ describe('useSocketEvents', () => {
         'game_over',
         'error',
       ]),
+    );
+  });
+
+  it('dispatches SET_ROOM_ERROR for room-specific server error codes', () => {
+    const connectionDispatch = vi.fn();
+    const gameDispatch = vi.fn();
+    const { socket, handlers } = createMockSocket();
+
+    mockUseConnectionDispatch.mockReturnValue(connectionDispatch);
+    mockUseGameDispatch.mockReturnValue(gameDispatch);
+    mockGetReconnectToken.mockReturnValue(null);
+
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(<HookProbe socket={socket} playerId="player-x" />);
+    });
+
+    handlers.get('error')?.({ code: 'ROOM_NOT_FOUND', message: "This room doesn't exist or has expired." });
+
+    expect(gameDispatch).toHaveBeenCalledWith({
+      type: 'SET_ROOM_ERROR',
+      payload: {
+        code: 'ROOM_NOT_FOUND',
+        message: "This room doesn't exist or has expired.",
+      },
+    });
+  });
+
+  it('does not dispatch SET_ROOM_ERROR for non-room server error codes', () => {
+    const connectionDispatch = vi.fn();
+    const gameDispatch = vi.fn();
+    const { socket, handlers } = createMockSocket();
+
+    mockUseConnectionDispatch.mockReturnValue(connectionDispatch);
+    mockUseGameDispatch.mockReturnValue(gameDispatch);
+    mockGetReconnectToken.mockReturnValue(null);
+
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(<HookProbe socket={socket} playerId="player-x" />);
+    });
+
+    handlers.get('error')?.({ code: 'SERVER_ERROR', message: 'Unexpected error' });
+
+    expect(gameDispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'SET_ROOM_ERROR',
+      }),
     );
   });
 });

@@ -43,6 +43,29 @@ describe('gameReducer', () => {
       lastMoveError: null,
       opponentDisconnect: null,
       reconnectError: null,
+      roomError: null,
+    });
+  });
+
+  it('stores room id and waiting phase on ROOM_CREATED action', () => {
+    const nextState = gameReducer(getInitialGameState(), {
+      type: 'ROOM_CREATED',
+      payload: { roomId: 'room-created-1' },
+    });
+
+    expect(nextState.roomId).toBe('room-created-1');
+    expect(nextState.phase).toBe('waiting');
+  });
+
+  it('stores room error payload when SET_ROOM_ERROR is dispatched', () => {
+    const nextState = gameReducer(getInitialGameState(), {
+      type: 'SET_ROOM_ERROR',
+      payload: { code: 'ROOM_NOT_FOUND', message: "This room doesn't exist or has expired." },
+    });
+
+    expect(nextState.roomError).toEqual({
+      code: 'ROOM_NOT_FOUND',
+      message: "This room doesn't exist or has expired.",
     });
   });
 
@@ -114,6 +137,10 @@ describe('gameReducer', () => {
         reconnectError: {
           code: 'SESSION_NOT_FOUND',
           message: 'Session missing',
+        },
+        roomError: {
+          code: 'ROOM_FULL',
+          message: 'This room is full.',
         },
       },
       { type: 'RESET' },

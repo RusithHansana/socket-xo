@@ -23,13 +23,16 @@ export interface GameContextState {
   lastMoveError: MoveError | null;
   opponentDisconnect: OpponentDisconnectState | null;
   reconnectError: MoveError | null;
+  roomError: MoveError | null;
 }
 
 export type GameAction =
   | { type: 'GAME_START'; payload: GameState }
   | { type: 'GAME_STATE_UPDATE'; payload: GameState }
   | { type: 'GAME_OVER'; payload: GameState }
+  | { type: 'ROOM_CREATED'; payload: { roomId: string } }
   | { type: 'MOVE_REJECTED'; payload: MoveError }
+  | { type: 'SET_ROOM_ERROR'; payload: MoveError }
   | { type: 'OPPONENT_DISCONNECTED'; payload: OpponentDisconnectState }
   | { type: 'OPPONENT_RECONNECTED' }
   | { type: 'RECONNECT_FAILED'; payload: MoveError }
@@ -52,6 +55,7 @@ function mapGameStateToContextState(state: GameState): GameContextState {
     lastMoveError: null,
     opponentDisconnect: null,
     reconnectError: null,
+    roomError: null,
   };
 }
 
@@ -71,6 +75,7 @@ export function getInitialGameState(): GameContextState {
     lastMoveError: null,
     opponentDisconnect: null,
     reconnectError: null,
+    roomError: null,
   };
 }
 
@@ -87,10 +92,32 @@ export function gameReducer(state: GameContextState, action: GameAction): GameCo
     case 'GAME_OVER':
       return mapGameStateToContextState(action.payload);
 
+    case 'ROOM_CREATED':
+      return {
+        ...state,
+        roomId: action.payload.roomId,
+        phase: 'waiting',
+        board: [
+          [null, null, null],
+          [null, null, null],
+          [null, null, null],
+        ],
+        outcome: null,
+        moveCount: 0,
+        lastMoveError: null,
+        roomError: null,
+      };
+
     case 'MOVE_REJECTED':
       return {
         ...state,
         lastMoveError: action.payload,
+      };
+
+    case 'SET_ROOM_ERROR':
+      return {
+        ...state,
+        roomError: action.payload,
       };
 
     case 'RECONNECT_FAILED':

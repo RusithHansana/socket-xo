@@ -119,9 +119,10 @@ describe('LobbyPage', () => {
     renderLobby();
 
     const buttons = container.querySelectorAll('button');
-    expect(buttons).toHaveLength(2);
+    expect(buttons).toHaveLength(3);
     expect(container.textContent).toContain('Play Online');
     expect(container.textContent).toContain('Play AI');
+    expect(container.textContent).toContain('Create Room');
   });
 
   it('displays the guest identity avatar and name', () => {
@@ -159,6 +160,22 @@ describe('LobbyPage', () => {
     });
 
     expect(mockEmit).toHaveBeenCalledWith('join_queue');
+  });
+
+  it('emits create_room when Create Room is activated', () => {
+    renderLobby();
+
+    const createRoomButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Create Room'),
+    );
+
+    expect(createRoomButton).not.toBeUndefined();
+
+    act(() => {
+      createRoomButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(mockEmit).toHaveBeenCalledWith('create_room');
   });
 
   it('shows matchmaking indicator when searching', () => {
@@ -254,7 +271,7 @@ describe('LobbyPage', () => {
     renderLobby();
 
     const skeletonCards = container.querySelectorAll('[data-loading="true"]');
-    expect(skeletonCards).toHaveLength(2);
+    expect(skeletonCards).toHaveLength(3);
     expect(container.textContent).toContain('Player-123');
   });
 
