@@ -64,6 +64,7 @@ export default function LobbyPage() {
   const gameState = useGameState();
   const socket = useSocket();
   const [matchedRoomId, setMatchedRoomId] = useState<string | null>(null);
+  const [matchMode, setMatchMode] = useState<'matchmaking' | 'create_room'>('matchmaking');
   const isLoading = status === 'idle' || status === 'connecting';
   const showMatched = matchedRoomId !== null;
   const showMatchmaking = searching || showMatched;
@@ -93,6 +94,7 @@ export default function LobbyPage() {
 
   const handleJoinQueue = () => {
     if (socket !== null) {
+      setMatchMode('matchmaking');
       socket.emit('join_queue');
     }
   };
@@ -107,6 +109,7 @@ export default function LobbyPage() {
 
   const handleCreateRoom = () => {
     if (socket !== null) {
+      setMatchMode('create_room');
       socket.emit('create_room');
     }
   };
@@ -145,6 +148,7 @@ export default function LobbyPage() {
             <MatchmakingIndicator
               searching={searching}
               matched={showMatched}
+              mode={matchMode}
               onCancel={handleCancelQueue}
             />
           ) : (

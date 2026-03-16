@@ -3,15 +3,24 @@ import styles from './matchmaking-indicator.module.css';
 export interface MatchmakingIndicatorProps {
   searching: boolean;
   matched: boolean;
+  mode?: 'matchmaking' | 'create_room';
   onCancel: () => void;
 }
 
 export function MatchmakingIndicator({
   searching,
   matched,
+  mode = 'matchmaking',
   onCancel,
 }: MatchmakingIndicatorProps) {
-  const announcement = matched ? 'Match found!' : 'Searching for opponent';
+  const isCreateRoom = mode === 'create_room';
+  const announcement = matched 
+    ? (isCreateRoom ? 'Room created!' : 'Match found!') 
+    : 'Searching for opponent...';
+    
+  const eyebrowText = matched 
+    ? (isCreateRoom ? 'Created' : 'Matched') 
+    : 'Matchmaking';
 
   return (
     <section className={styles.panel} aria-label="Matchmaking status">
@@ -19,10 +28,12 @@ export function MatchmakingIndicator({
         {announcement}
       </p>
 
-      <p className={styles.eyebrow}>{matched ? 'Matched' : 'Matchmaking'}</p>
+      <p className={styles.eyebrow}>{eyebrowText}</p>
 
       {matched ? (
-        <h2 className={`${styles.title} ${styles.matchedTitle}`}>Match found!</h2>
+        <h2 className={`${styles.title} ${styles.matchedTitle}`}>
+          {isCreateRoom ? 'Room created!' : 'Match found!'}
+        </h2>
       ) : (
         <h2 className={styles.title}>Searching for opponent...</h2>
       )}
