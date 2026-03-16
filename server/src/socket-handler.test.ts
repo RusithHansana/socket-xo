@@ -678,7 +678,8 @@ describe('registerSocketHandlers direct room link flow', () => {
       expect.objectContaining({ phase: 'playing' }),
     );
 
-    const lastChannel = io.to.mock.results.at(-1)?.value as { emit: (event: string, data: unknown) => void };
+    const lastResult = io.to.mock.results[io.to.mock.results.length - 1];
+    const lastChannel = lastResult?.value as { emit: (event: string, data: unknown) => void };
     expect(lastChannel.emit).toHaveBeenCalledWith('game_start', expect.objectContaining({ phase: 'playing' }));
 
     expect(joiner.emit).toHaveBeenCalledWith('reconnect_token', { reconnectToken: 'token-player-2' });

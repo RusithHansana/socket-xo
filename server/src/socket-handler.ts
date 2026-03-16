@@ -666,7 +666,7 @@ export function registerSocketHandlers(
 
             const token = issueReconnectToken(playerId, payload.roomId);
             const session = getSession(playerId);
-            if (token !== null && session?.socketId !== null) {
+            if (token !== null && session !== null && session.socketId !== null) {
               io.sockets.sockets.get(session.socketId)?.emit('reconnect_token', { reconnectToken: token });
             }
           }
