@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   addPlayerToRoom,
   clearAllRooms,
+  createWaitingRoom,
   createRoom,
   getAllRooms,
   getCompletedRooms,
@@ -173,9 +174,42 @@ describe('room-manager', () => {
   });
 
   it('6.9 — addPlayerToRoom is unreachable on success because rooms are created full', () => {
-    // We cannot test the success path of addPlayerToRoom properly because createRoom 
-    // requires 2 players and instantly fills the room to MAX_PLAYERS_PER_ROOM (2).
-    expect(true).toBe(true);
+    const waitingRoom = createWaitingRoom('player-1', createPlayerInfo('player-1'));
+
+    const result = addPlayerToRoom(waitingRoom.roomId, 'player-2', createPlayerInfo('player-2'));
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.room.playerIds).toEqual(['player-1', 'player-2']);
+      expect(result.room.status).toBe('active');
+      expect(result.room.state.phase).toBe('playing');
+      expect(result.room.state.players).toHaveLength(2);
+      expect(result.room.state.players[0]?.symbol).toBe('X');
+      expect(result.room.state.players[1]?.symbol).toBe('O');
+    }
+  });
+
+  it('4.1 — createWaitingRoom creates a waiting room with one X player and initial waiting state', () => {
+    const room = createWaitingRoom('player-1', createPlayerInfo('player-1'));
+
+    expect(room.roomId).toMatch(UUID_V4_PATTERN);
+    expect(room.playerIds).toEqual(['player-1']);
+    expect(room.status).toBe('waiting');
+    expect(room.state.phase).toBe('waiting');
+    expect(room.state.currentTurn).toBe('X');
+    expect(room.state.moveCount).toBe(0);
+    expect(room.state.outcome).toBeNull();
+    expect(room.state.board).toEqual([
+      [null, null, null],
+      [null, null, null],
+      [null, null, null],
+    ]);
+    expect(room.state.players).toEqual([
+      {
+        ...createPlayerInfo('player-1'),
+        symbol: 'X',
+      },
+    ]);
   });
 
   it('6.9.1 — addPlayerToRoom rejects with INVALID_PLAYER_ID for mismatching payload', () => {
@@ -243,6 +277,27 @@ describe('room-manager', () => {
       error: {
         code: 'ALREADY_IN_ROOM',
         message: `Player player-1 is already in room ${room.roomId}.`,
+      },
+    });
+  });
+
+  it('6.12.1 — addPlayerToRoom rejects join attempts for completed rooms', () => {
+    const room = createRoom(
+      'player-1',
+      'player-2',
+      createPlayerInfo('player-1'),
+      createPlayerInfo('player-2'),
+    );
+
+    markRoomCompleted(room.roomId);
+
+    const result = addPlayerToRoom(room.roomId, 'player-3', createPlayerInfo('player-3'));
+
+    expect(result).toEqual({
+      success: false,
+      error: {
+        code: 'GAME_ENDED',
+        message: `Game in room ${room.roomId} has already ended.`,
       },
     });
   });

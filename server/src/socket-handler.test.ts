@@ -21,6 +21,8 @@ const {
   mockRemoveFromQueue,
   mockTryMatchPair,
   mockCreateRoom,
+  mockCreateWaitingRoom,
+  mockAddPlayerToRoom,
   mockStartAiGame,
   mockHandleAiMove,
   mockCleanupAiGame,
@@ -49,6 +51,8 @@ const {
   mockRemoveFromQueue: vi.fn(),
   mockTryMatchPair: vi.fn(),
   mockCreateRoom: vi.fn(),
+  mockCreateWaitingRoom: vi.fn(),
+  mockAddPlayerToRoom: vi.fn(),
   mockStartAiGame: vi.fn(),
   mockHandleAiMove: vi.fn(),
   mockCleanupAiGame: vi.fn(),
@@ -61,6 +65,8 @@ const {
 
 vi.mock('./room/room-manager.js', () => ({
   createRoom: mockCreateRoom,
+  createWaitingRoom: mockCreateWaitingRoom,
+  addPlayerToRoom: mockAddPlayerToRoom,
   getGameState: mockGetGameState,
   getRoomByPlayerId: mockGetRoomByPlayerId,
   getRoom: mockGetRoom,
@@ -259,6 +265,29 @@ async function triggerJoinQueue(socket: MockSocket): Promise<void> {
   }
 
   await handler();
+}
+
+async function triggerCreateRoom(socket: MockSocket): Promise<void> {
+  const handler = socket.listeners.get('create_room');
+
+  if (handler === undefined) {
+    throw new Error('Expected create_room handler to be registered.');
+  }
+
+  await handler();
+}
+
+async function triggerJoinRoom(
+  socket: MockSocket,
+  payload: { roomId: string; playerId: string },
+): Promise<void> {
+  const handler = socket.listeners.get('join_room');
+
+  if (handler === undefined) {
+    throw new Error('Expected join_room handler to be registered.');
+  }
+
+  await handler(payload);
 }
 
 function expectRoomBroadcast(io: MockServer, roomId: string, eventName: string, payload: unknown): void {
@@ -490,6 +519,235 @@ describe('registerSocketHandlers matchmaking reconnect token delivery', () => {
     expect(player1.emit).toHaveBeenCalledWith('queue_joined');
     expect(player1.emit).toHaveBeenCalledWith('reconnect_token', { reconnectToken: 'token-player-1' });
     expect(player2.emit).toHaveBeenCalledWith('reconnect_token', { reconnectToken: 'token-player-2' });
+  });
+});
+
+describe('registerSocketHandlers direct room link flow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockIssueReconnectToken.mockReset();
+    mockIsAiGame.mockReturnValue(false);
+    mockGetRoomByPlayerId.mockReturnValue(null);
+    mockTryMatchPair.mockReturnValue(null);
+    mockCleanupAiGame.mockReturnValue({ error: null });
+    mockRegisterSession.mockImplementation((playerId: string, socketId: string) => ({
+      playerId,
+      socketId,
+      roomId: null,
+      reconnectToken: null,
+      connected: true,
+    }));
+    mockGetSession.mockReturnValue(null);
+  });
+
+  it('4.1.3.1 — create_room creates waiting room, emits room_created and reconnect token', async () => {
+    const io = createIo();
+    const socket = createSocket('player-1', null);
+    const waitingState = createState({
+      roomId: 'room-waiting',
+      players: [
+        {
+          playerId: 'player-1',
+          displayName: 'Player One',
+          avatarUrl: 'https://robohash.org/player-1',
+          symbol: 'X',
+          connected: true,
+        },
+      ],
+      phase: 'waiting',
+    });
+    const waitingRoom = {
+      roomId: 'room-waiting',
+      playerIds: ['player-1'],
+      state: waitingState,
+      createdAt: new Date().toISOString(),
+      status: 'waiting' as const,
+    };
+
+    mockCreateWaitingRoom.mockReturnValue(waitingRoom);
+    mockIssueReconnectToken.mockReturnValue('token-player-1');
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+
+    await triggerCreateRoom(socket);
+
+    expect(mockCreateWaitingRoom).toHaveBeenCalledWith(
+      'player-1',
+      expect.objectContaining({ playerId: 'player-1' }),
+    );
+    expect(socket.join).toHaveBeenCalledWith('room-waiting');
+    expect(socket.data.roomId).toBe('room-waiting');
+    expect(socket.emit).toHaveBeenCalledWith('room_created', { roomId: 'room-waiting' });
+    expect(socket.emit).toHaveBeenCalledWith('reconnect_token', { reconnectToken: 'token-player-1' });
+    expect(socket.emit).toHaveBeenCalledWith('game_state_update', waitingState);
+  });
+
+  it('4.1.3.2 — create_room rejects players already in active rooms', async () => {
+    const io = createIo();
+    const socket = createSocket('player-1', null);
+    mockGetRoomByPlayerId.mockReturnValue(createRoom(createState()));
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+
+    await triggerCreateRoom(socket);
+
+    expect(socket.emit).toHaveBeenCalledWith('error', {
+      code: 'ALREADY_IN_GAME',
+      message: 'You are already in an active game.',
+    });
+    expect(mockCreateWaitingRoom).not.toHaveBeenCalled();
+  });
+
+  it('4.1.4.1 — join_room success starts game and emits reconnect tokens to both players', async () => {
+    const io = createIo();
+    const joiner = createSocket('player-2', null);
+    const waitingPlayerSocket = createSocket('player-1', 'room-1');
+    io.sockets.sockets.set(waitingPlayerSocket.id, waitingPlayerSocket);
+
+    const waitingRoom = {
+      ...createRoom(
+        createState({
+          roomId: 'room-1',
+          players: [
+            {
+              playerId: 'player-1',
+              displayName: 'Player One',
+              avatarUrl: 'https://robohash.org/player-1',
+              symbol: 'X',
+              connected: true,
+            },
+          ],
+          phase: 'waiting',
+        }),
+      ),
+      playerIds: ['player-1'],
+      status: 'waiting' as const,
+    };
+
+    const activeState = createState({ roomId: 'room-1' });
+    const addResult = {
+      success: true as const,
+      room: {
+        ...createRoom(activeState),
+        roomId: 'room-1',
+        playerIds: ['player-1', 'player-2'],
+        status: 'active' as const,
+      },
+    };
+
+    mockGetRoom.mockReturnValue(waitingRoom);
+    mockAddPlayerToRoom.mockReturnValue(addResult);
+    mockGetSession.mockImplementation((playerId: string) =>
+      playerId === 'player-1'
+        ? {
+            playerId: 'player-1',
+            socketId: waitingPlayerSocket.id,
+            roomId: 'room-1',
+            reconnectToken: null,
+            connected: true,
+          }
+        : {
+            playerId: 'player-2',
+            socketId: joiner.id,
+            roomId: 'room-1',
+            reconnectToken: null,
+            connected: true,
+          },
+    );
+    mockIssueReconnectToken
+      .mockReturnValueOnce('token-player-2')
+      .mockReturnValueOnce('token-player-1');
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, joiner);
+
+    await triggerJoinRoom(joiner, { roomId: 'room-1', playerId: 'player-2' });
+
+    expect(mockAddPlayerToRoom).toHaveBeenCalledWith(
+      'room-1',
+      'player-2',
+      expect.objectContaining({ playerId: 'player-2' }),
+    );
+    expect(joiner.join).toHaveBeenCalledWith('room-1');
+    expect(joiner.data.roomId).toBe('room-1');
+    expect(mockUpdateRoomState).toHaveBeenCalledWith(
+      'room-1',
+      expect.objectContaining({ phase: 'playing' }),
+    );
+
+    const lastChannel = io.to.mock.results.at(-1)?.value as { emit: (event: string, data: unknown) => void };
+    expect(lastChannel.emit).toHaveBeenCalledWith('game_start', expect.objectContaining({ phase: 'playing' }));
+
+    expect(joiner.emit).toHaveBeenCalledWith('reconnect_token', { reconnectToken: 'token-player-2' });
+    expect(waitingPlayerSocket.emit).toHaveBeenCalledWith('reconnect_token', { reconnectToken: 'token-player-1' });
+  });
+
+  it('4.1.4.2 — join_room rejects full rooms', async () => {
+    const io = createIo();
+    const socket = createSocket('player-3', null);
+    const waitingRoom = {
+      ...createRoom(createState({ roomId: 'room-1' })),
+      roomId: 'room-1',
+      playerIds: ['player-1', 'player-2'],
+      status: 'active' as const,
+    };
+
+    mockGetRoom.mockReturnValue(waitingRoom);
+    mockAddPlayerToRoom.mockReturnValue({
+      success: false,
+      error: { code: 'ROOM_FULL', message: 'This room is full.' },
+    });
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+    await triggerJoinRoom(socket, { roomId: 'room-1', playerId: 'player-3' });
+
+    expect(socket.emit).toHaveBeenCalledWith('error', {
+      code: 'ROOM_FULL',
+      message: 'This room is full.',
+    });
+  });
+
+  it('4.1.4.3 — join_room rejects non-existent rooms', async () => {
+    const io = createIo();
+    const socket = createSocket('player-2', null);
+
+    mockGetRoom.mockReturnValue(null);
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+    await triggerJoinRoom(socket, { roomId: 'missing-room', playerId: 'player-2' });
+
+    expect(socket.emit).toHaveBeenCalledWith('error', {
+      code: 'ROOM_NOT_FOUND',
+      message: 'Room missing-room was not found.',
+    });
+    expect(mockAddPlayerToRoom).not.toHaveBeenCalled();
+  });
+
+  it('4.1.4.4 — join_room rejects completed rooms with GAME_ENDED', async () => {
+    const io = createIo();
+    const socket = createSocket('player-3', null);
+    const completedRoom = {
+      ...createRoom(createState({ roomId: 'room-complete', phase: 'finished' })),
+      roomId: 'room-complete',
+      status: 'completed' as const,
+    };
+
+    mockGetRoom.mockReturnValue(completedRoom);
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+    await triggerJoinRoom(socket, { roomId: 'room-complete', playerId: 'player-3' });
+
+    expect(socket.emit).toHaveBeenCalledWith('error', {
+      code: 'GAME_ENDED',
+      message: 'This game has already ended.',
+    });
+    expect(mockAddPlayerToRoom).not.toHaveBeenCalled();
   });
 });
 

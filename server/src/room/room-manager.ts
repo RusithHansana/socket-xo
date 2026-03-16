@@ -86,6 +86,36 @@ export function createRoom(
   return cloneRoom(room);
 }
 
+export function createWaitingRoom(playerId: string, playerInfo: PlayerInfo): GameRoom {
+  if (playerId !== playerInfo.playerId) {
+    throw new Error(`Player ID mismatch: ${playerId} !== ${playerInfo.playerId}`);
+  }
+
+  const roomId = randomUUID();
+  const room: GameRoom = {
+    roomId,
+    playerIds: [playerId],
+    state: {
+      roomId,
+      board: [
+        [null, null, null],
+        [null, null, null],
+        [null, null, null],
+      ],
+      currentTurn: 'X',
+      players: [{ ...playerInfo, symbol: 'X' }],
+      phase: 'waiting',
+      outcome: null,
+      moveCount: 0,
+    },
+    createdAt: new Date().toISOString(),
+    status: 'waiting',
+  };
+
+  rooms.set(roomId, room);
+  return cloneRoom(room);
+}
+
 export function getRoom(roomId: string): GameRoom | null {
   const room = getStoredRoom(roomId);
 
@@ -135,6 +165,13 @@ export function addPlayerToRoom(
     };
   }
 
+  if (room.status === 'completed') {
+    return {
+      success: false,
+      error: createError('GAME_ENDED', `Game in room ${roomId} has already ended.`),
+    };
+  }
+
   if (room.playerIds.length >= MAX_PLAYERS_PER_ROOM) {
     return {
       success: false,
@@ -145,14 +182,23 @@ export function addPlayerToRoom(
   const existingSymbol = room.state.players[0]?.symbol;
   const nextSymbol = existingSymbol === 'X' ? 'O' : 'X';
 
+  const nextPlayerIds = [...room.playerIds, playerId];
+  const nextState: GameState = {
+    ...room.state,
+    players: [...room.state.players, { ...playerInfo, symbol: nextSymbol }],
+    phase: nextPlayerIds.length === MAX_PLAYERS_PER_ROOM ? 'playing' : room.state.phase,
+  };
+
   const updatedRoom: GameRoom = {
     ...room,
-    playerIds: [...room.playerIds, playerId],
-    state: {
-      ...room.state,
-      players: [...room.state.players, { ...playerInfo, symbol: nextSymbol }],
-    },
-    status: room.state.phase === 'finished' ? 'completed' : 'active',
+    playerIds: nextPlayerIds,
+    state: nextState,
+    status:
+      nextState.phase === 'finished'
+        ? 'completed'
+        : nextPlayerIds.length < MAX_PLAYERS_PER_ROOM
+          ? 'waiting'
+          : 'active',
   };
 
   rooms.set(roomId, updatedRoom);

@@ -11,7 +11,9 @@ import { cleanupAiGame, handleAiMove, isAiGame, startAiGame } from './game/ai-ga
 import { applyMove, validateMove } from './game/game-engine.js';
 import { addToQueue, removeFromQueue, tryMatchPair } from './matchmaking/matchmaking.js';
 import {
+  addPlayerToRoom,
   createRoom,
+  createWaitingRoom,
   getGameState,
   getRoom,
   getRoomByPlayerId,
@@ -399,6 +401,48 @@ export function registerSocketHandlers(
       }
     });
 
+    socket.on('create_room', async () => {
+      try {
+        const existingRoom = getRoomByPlayerId(socket.data.playerId);
+        if (existingRoom !== null && existingRoom.status !== 'completed') {
+          socket.emit('error', { code: 'ALREADY_IN_GAME', message: 'You are already in an active game.' });
+          return;
+        }
+
+        removeFromQueue(socket.data.playerId);
+
+        const room = createWaitingRoom(
+          socket.data.playerId,
+          createOnlinePlayerInfo(socket, socket.data.playerId),
+        );
+
+        await socket.join(room.roomId);
+        socket.data.roomId = room.roomId;
+
+        const reconnectToken = issueReconnectToken(socket.data.playerId, room.roomId);
+        if (reconnectToken !== null) {
+          socket.emit('reconnect_token', { reconnectToken });
+        }
+
+        socket.emit('room_created', { roomId: room.roomId });
+        socket.emit('game_state_update', room.state);
+
+        logger.debug(
+          { playerId: socket.data.playerId, roomId: room.roomId },
+          'create_room received',
+        );
+      } catch (err) {
+        logger.error(
+          {
+            err: err instanceof Error ? err : new Error(String(err)),
+            playerId: socket.data.playerId,
+          },
+          'Error handling create_room',
+        );
+        socket.emit('error', { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' });
+      }
+    });
+
     socket.on('reconnect_attempt', async (payload) => {
       try {
         if (!payload || typeof payload !== 'object' || typeof payload.playerId !== 'string' || typeof payload.reconnectToken !== 'string') {
@@ -528,9 +572,106 @@ export function registerSocketHandlers(
       }
     });
 
-    socket.on('join_room', (payload) => {
+    socket.on('join_room', async (payload) => {
       try {
-        // TODO: implement in Story 4.1
+        if (
+          payload === null
+          || typeof payload !== 'object'
+          || typeof payload.roomId !== 'string'
+          || typeof payload.playerId !== 'string'
+        ) {
+          socket.emit('error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Join room payload is invalid or missing required fields.',
+          });
+          return;
+        }
+
+        if (payload.playerId !== socket.data.playerId) {
+          socket.emit('error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Join room payload playerId must match current session player.',
+          });
+          return;
+        }
+
+        const room = getRoom(payload.roomId);
+
+        if (room === null) {
+          socket.emit('error', {
+            code: 'ROOM_NOT_FOUND',
+            message: `Room ${payload.roomId} was not found.`,
+          });
+          return;
+        }
+
+        if (room.playerIds.includes(payload.playerId)) {
+          socket.emit('error', {
+            code: 'ALREADY_IN_ROOM',
+            message: `Player ${payload.playerId} is already in room ${payload.roomId}.`,
+          });
+          return;
+        }
+
+        if (room.status === 'completed') {
+          socket.emit('error', { code: 'GAME_ENDED', message: 'This game has already ended.' });
+          return;
+        }
+
+        const existingRoom = getRoomByPlayerId(socket.data.playerId);
+        if (
+          existingRoom !== null
+          && existingRoom.status !== 'completed'
+          && existingRoom.roomId !== payload.roomId
+        ) {
+          socket.emit('error', { code: 'ALREADY_IN_GAME', message: 'You are already in an active game.' });
+          return;
+        }
+
+        const addResult = addPlayerToRoom(
+          payload.roomId,
+          payload.playerId,
+          createOnlinePlayerInfo(socket, payload.playerId),
+        );
+
+        if (!addResult.success) {
+          socket.emit('error', {
+            code: addResult.error.code,
+            message: addResult.error.message,
+          });
+          return;
+        }
+
+        await socket.join(payload.roomId);
+        socket.data.roomId = payload.roomId;
+
+        const joinerReconnectToken = issueReconnectToken(payload.playerId, payload.roomId);
+        if (joinerReconnectToken !== null) {
+          socket.emit('reconnect_token', { reconnectToken: joinerReconnectToken });
+        }
+
+        if (addResult.room.playerIds.length === 2) {
+          const playingState = {
+            ...addResult.room.state,
+            phase: 'playing' as const,
+          };
+
+          const updatedRoom = updateRoomState(payload.roomId, playingState);
+          io.to(payload.roomId).emit('game_start', updatedRoom?.state ?? playingState);
+
+          for (const playerId of addResult.room.playerIds) {
+            if (playerId === payload.playerId) {
+              continue;
+            }
+
+            const token = issueReconnectToken(playerId, payload.roomId);
+            const session = getSession(playerId);
+            if (token !== null && session?.socketId !== null) {
+              io.sockets.sockets.get(session.socketId)?.emit('reconnect_token', { reconnectToken: token });
+            }
+          }
+        }
+
         logger.debug(
           { playerId: payload?.playerId, roomId: payload?.roomId },
           'join_room received',
