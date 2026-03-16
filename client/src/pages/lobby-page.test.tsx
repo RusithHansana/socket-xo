@@ -275,7 +275,8 @@ describe('LobbyPage', () => {
     expect(container.textContent).toContain('Player-123');
   });
 
-  it('navigates to /game/:roomId when connection is in_game with an active room', async () => {
+  it('navigates to /game/:roomId when connection is in_game with an active room', () => {
+    vi.useFakeTimers();
     mockUseConnectionStatus.mockReturnValue({
       status: 'in_game',
       searching: false,
@@ -315,7 +316,13 @@ describe('LobbyPage', () => {
       root?.render(<RouterProvider router={router} />);
     });
 
-    await expect.poll(() => router.state.location.pathname).toBe('/game/room-xyz');
+    act(() => {
+      vi.advanceTimersByTime(800);
+    });
+
+    expect(router.state.location.pathname).toBe('/game/room-xyz');
     expect(container.textContent).toContain('Online Destination');
+    
+    vi.useRealTimers();
   });
 });

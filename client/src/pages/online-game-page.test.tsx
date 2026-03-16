@@ -101,6 +101,7 @@ describe('OnlineGamePage', () => {
         {
           path: '/game/:roomId',
           loader: ({ params }) => ({ roomId: params.roomId ?? '' }),
+          HydrateFallback: () => null,
           element: <OnlineGamePage />,
         },
         {
