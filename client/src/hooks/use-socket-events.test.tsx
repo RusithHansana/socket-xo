@@ -191,8 +191,33 @@ describe('useSocketEvents', () => {
       type: 'RECONNECT_FAILED',
       payload: { code: 'SESSION_NOT_FOUND', message: 'Session missing' },
     });
+    expect(mockGetReconnectToken).toHaveBeenCalledWith('player-x');
     expect(mockStoreReconnectToken).toHaveBeenCalledWith('player-x', 'token-1');
     expect(mockClearReconnectToken).toHaveBeenCalledWith('player-x');
+    
+    // Chat assertions
+    expect(chatDispatch).toHaveBeenCalledWith({
+      type: 'CHAT_SNAPSHOT_REPLACED',
+      payload: sampleGameState.chatMessages,
+    });
+    
+    handlers.get('chat_message')?.({
+      id: 'msg-1',
+      roomId: 'room-1',
+      playerId: 'player-x',
+      content: 'hello',
+      timestamp: 1234,
+    });
+    expect(chatDispatch).toHaveBeenCalledWith({
+      type: 'CHAT_MESSAGE_RECEIVED',
+      payload: {
+        id: 'msg-1',
+        roomId: 'room-1',
+        playerId: 'player-x',
+        content: 'hello',
+        timestamp: 1234,
+      },
+    });
   });
 
   it('emits reconnect_attempt and transitions to reconnecting on connect when token exists', () => {
