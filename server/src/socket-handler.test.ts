@@ -29,6 +29,9 @@ const {
   mockIsAiGame,
   mockStartGraceTimer,
   mockCancelGraceTimer,
+  mockAppendChatMessage,
+  mockGetChatHistory,
+  mockEncodeHtml,
   mockLoggerDebug,
   mockLoggerError,
 } = vi.hoisted(() => ({
@@ -59,6 +62,9 @@ const {
   mockIsAiGame: vi.fn(),
   mockStartGraceTimer: vi.fn(),
   mockCancelGraceTimer: vi.fn(),
+  mockAppendChatMessage: vi.fn(),
+  mockGetChatHistory: vi.fn(),
+  mockEncodeHtml: vi.fn(),
   mockLoggerDebug: vi.fn(),
   mockLoggerError: vi.fn(),
 }));
@@ -77,6 +83,16 @@ vi.mock('./room/room-manager.js', () => ({
 vi.mock('./room/grace-timer.js', () => ({
   startGraceTimer: mockStartGraceTimer,
   cancelGraceTimer: mockCancelGraceTimer,
+}));
+
+vi.mock('./chat/chat-handler.js', () => ({
+  appendChatMessage: mockAppendChatMessage,
+  getChatHistory: mockGetChatHistory,
+  clearChatHistory: vi.fn(),
+}));
+
+vi.mock('./utils/html-encode.js', () => ({
+  encodeHtml: mockEncodeHtml,
 }));
 
 vi.mock('./config.js', () => ({
@@ -169,6 +185,7 @@ function createState(overrides: Partial<GameState> = {}): GameState {
     phase: 'playing',
     outcome: null,
     moveCount: 0,
+    chatMessages: [],
     ...overrides,
   };
 }
@@ -229,6 +246,16 @@ function triggerMakeMove(socket: MockSocket, payload: MovePayload): void {
 
   if (handler === undefined) {
     throw new Error('Expected make_move handler to be registered.');
+  }
+
+  handler(payload);
+}
+
+function triggerSendChat(socket: MockSocket, payload: { roomId: string; content: string }): void {
+  const handler = socket.listeners.get('send_chat');
+
+  if (handler === undefined) {
+    throw new Error('Expected send_chat handler to be registered.');
   }
 
   handler(payload);
@@ -473,6 +500,135 @@ describe('registerSocketHandlers make_move (online)', () => {
     expect(mockMarkRoomCompleted).toHaveBeenCalledWith('room-1');
     expect(mockClearReconnectToken).toHaveBeenCalledWith('player-1');
     expect(mockClearReconnectToken).toHaveBeenCalledWith('player-2');
+  });
+});
+
+describe('registerSocketHandlers send_chat', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockIsAiGame.mockReturnValue(false);
+    mockGetRoomByPlayerId.mockReturnValue(null);
+    mockTryMatchPair.mockReturnValue(null);
+    mockCleanupAiGame.mockReturnValue({ error: null });
+    mockRegisterSession.mockReturnValue({
+      playerId: 'player-1',
+      socketId: 'player-1-socket',
+      roomId: 'room-1',
+      reconnectToken: null,
+      connected: true,
+    });
+    mockEncodeHtml.mockImplementation((content: string) => content);
+    mockAppendChatMessage.mockImplementation((_roomId: string, message) => [message]);
+    mockGetChatHistory.mockReturnValue([]);
+  });
+
+  it('5.1.1 — valid send_chat emits encoded chat_message to room and updates room snapshot', () => {
+    const io = createIo();
+    const socket = createSocket('player-1', 'room-1');
+    const roomState = createState({ roomId: 'room-1' });
+    const room = createRoom(roomState);
+
+    mockGetRoom.mockReturnValue(room);
+    mockEncodeHtml.mockReturnValue('safe message');
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+
+    triggerSendChat(socket, { roomId: 'room-1', content: 'safe message' });
+
+    expect(mockEncodeHtml).toHaveBeenCalledWith('safe message');
+    expect(mockAppendChatMessage).toHaveBeenCalledWith(
+      'room-1',
+      expect.objectContaining({
+        playerId: 'player-1',
+        displayName: 'Player One',
+        content: 'safe message',
+      }),
+    );
+    expect(mockUpdateRoomState).toHaveBeenCalledWith(
+      'room-1',
+      expect.objectContaining({
+        chatMessages: [
+          expect.objectContaining({
+            playerId: 'player-1',
+            displayName: 'Player One',
+            content: 'safe message',
+          }),
+        ],
+      }),
+    );
+
+    const roomChannel = io.to.mock.results[0]?.value as { emit: (event: string, data: unknown) => void };
+    expect(roomChannel.emit).toHaveBeenCalledWith(
+      'chat_message',
+      expect.objectContaining({
+        playerId: 'player-1',
+        displayName: 'Player One',
+        content: 'safe message',
+      }),
+    );
+  });
+
+  it('rejects send_chat with content exceeding 256 characters', () => {
+    const io = createIo();
+    const socket = createSocket('player-1', 'room-1');
+    const roomState = createState({ roomId: 'room-1' });
+
+    mockGetRoom.mockReturnValue(createRoom(roomState));
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+
+    const longMessage = 'a'.repeat(257);
+    triggerSendChat(socket, { roomId: 'room-1', content: longMessage });
+
+    expect(socket.emit).toHaveBeenCalledWith('error', {
+      code: 'INVALID_PAYLOAD',
+      message: 'Chat message content is too long (maximum 256 characters).',
+    });
+    expect(mockAppendChatMessage).not.toHaveBeenCalled();
+  });
+
+  it('5.1.3 — rejects send_chat for players outside the room with structured error', () => {
+    const io = createIo();
+    const socket = createSocket('outside-player', null);
+    const roomState = createState({ roomId: 'room-1' });
+
+    mockGetRoom.mockReturnValue(createRoom(roomState));
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+
+    triggerSendChat(socket, { roomId: 'room-1', content: 'hello' });
+
+    expect(socket.emit).toHaveBeenCalledWith('error', {
+      code: 'NOT_IN_ROOM',
+      message: 'Player is not a member of the specified room.',
+    });
+    expect(mockAppendChatMessage).not.toHaveBeenCalled();
+  });
+
+  it('5.1.2 — encodes malicious content before broadcast', () => {
+    const io = createIo();
+    const socket = createSocket('player-1', 'room-1');
+    const roomState = createState({ roomId: 'room-1' });
+
+    mockGetRoom.mockReturnValue(createRoom(roomState));
+    mockEncodeHtml.mockReturnValue('&lt;script&gt;alert(1)&lt;/script&gt;');
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+
+    triggerSendChat(socket, { roomId: 'room-1', content: '<script>alert(1)</script>' });
+
+    const roomChannel = io.to.mock.results[0]?.value as { emit: (event: string, data: unknown) => void };
+    expect(roomChannel.emit).toHaveBeenCalledWith(
+      'chat_message',
+      expect.objectContaining({
+        content: '&lt;script&gt;alert(1)&lt;/script&gt;',
+      }),
+    );
   });
 });
 
@@ -861,6 +1017,15 @@ describe('registerSocketHandlers disconnect/reconnect grace flow', () => {
     const io = createIo();
     const socket = createSocket('player-1', null);
     const roomState = createState({
+      chatMessages: [
+        {
+          id: 'chat-1',
+          playerId: 'player-2',
+          displayName: 'Player Two',
+          content: 'hello',
+          timestamp: 1_700_000_000_000,
+        },
+      ],
       players: [
         { ...createState().players[0]!, connected: false },
         createState().players[1]!,
@@ -910,7 +1075,13 @@ describe('registerSocketHandlers disconnect/reconnect grace flow', () => {
     expect(roomChannels[0]?.emit).toHaveBeenCalledWith('game_state_update', updatedState);
     expect(roomChannels[1]?.emit).toHaveBeenCalledWith('player_reconnected', { playerId: 'player-1' });
 
-    expect(socket.emit).toHaveBeenCalledWith('reconnect_success', expect.objectContaining({ roomId: 'room-1' }));
+    expect(socket.emit).toHaveBeenCalledWith(
+      'reconnect_success',
+      expect.objectContaining({
+        roomId: 'room-1',
+        chatMessages: roomState.chatMessages,
+      }),
+    );
     expect(socket.emit).toHaveBeenCalledWith('reconnect_token', { reconnectToken: 'token-2' });
   });
 
