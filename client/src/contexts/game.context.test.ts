@@ -34,15 +34,19 @@ const baseGameState: GameState = {
 
 describe('gameReducer', () => {
   it('maps authoritative game state into context state', () => {
-    const { chatMessages: _chatMessages, ...authoritativeGameFields } = baseGameState;
-
     const nextState = gameReducer(getInitialGameState(), {
       type: 'GAME_START',
       payload: baseGameState,
     });
 
     expect(nextState).toEqual({
-      ...authoritativeGameFields,
+      roomId: baseGameState.roomId,
+      board: baseGameState.board,
+      currentTurn: baseGameState.currentTurn,
+      players: baseGameState.players,
+      phase: baseGameState.phase,
+      outcome: baseGameState.outcome,
+      moveCount: baseGameState.moveCount,
       lastMoveError: null,
       opponentDisconnect: null,
       reconnectError: null,
