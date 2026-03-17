@@ -1,4 +1,5 @@
 import type { PlayerInfo } from './player.types';
+import type { ChatMessage } from './chat.types';
 
 /** The two possible piece symbols a player can be assigned. */
 export type Symbol = 'X' | 'O';
@@ -51,4 +52,6 @@ export interface GameState {
   outcome: GameOutcome | null;
   /** Total number of moves made so far (used for draw detection). */
   moveCount: number;
+  /** Most recent chat messages for this room, provided in authoritative snapshots. */
+  chatMessages: ChatMessage[];
 }

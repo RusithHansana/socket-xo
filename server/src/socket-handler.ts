@@ -1,4 +1,5 @@
 import { Server, type Socket } from 'socket.io';
+import { randomUUID } from 'node:crypto';
 import type {
   ClientToServerEvents,
   PlayerSession,
@@ -20,6 +21,7 @@ import {
   markRoomCompleted,
   updateRoomState,
 } from './room/room-manager.js';
+import { appendChatMessage, clearChatHistory } from './chat/chat-handler.js';
 import { cancelGraceTimer, startGraceTimer } from './room/grace-timer.js';
 import {
   clearReconnectToken,
@@ -32,6 +34,7 @@ import {
   validateReconnectToken,
 } from './session/session-manager.js';
 import { config } from './config.js';
+import { encodeHtml } from './utils/html-encode.js';
 import { logger } from './utils/logger.js';
 
 type AppServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
@@ -359,6 +362,7 @@ export function registerSocketHandlers(
         if (nextState.phase === 'finished') {
           io.to(payload.roomId).emit('game_over', nextState);
           markRoomCompleted(payload.roomId);
+          clearChatHistory(payload.roomId);
 
           for (const playerId of room.playerIds) {
             clearReconnectToken(playerId);
@@ -384,9 +388,75 @@ export function registerSocketHandlers(
 
     socket.on('send_chat', (payload) => {
       try {
-        // TODO: implement in Story 5.1
+        if (
+          payload === null
+          || typeof payload !== 'object'
+          || typeof payload.roomId !== 'string'
+          || typeof payload.content !== 'string'
+        ) {
+          socket.emit('error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Chat payload is invalid or missing required fields.',
+          });
+          return;
+        }
+
+        const trimmedContent = payload.content.trim();
+        if (trimmedContent.length === 0) {
+          socket.emit('error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Chat message content cannot be empty.',
+          });
+          return;
+        }
+
+        const room = getRoom(payload.roomId);
+
+        if (room === null) {
+          socket.emit('error', {
+            code: 'ROOM_NOT_FOUND',
+            message: `Room ${payload.roomId} was not found.`,
+          });
+          return;
+        }
+
+        if (room.status === 'completed' || room.state.phase !== 'playing') {
+          socket.emit('error', {
+            code: 'GAME_ENDED',
+            message: 'Cannot send chat messages because this game is not active.',
+          });
+          return;
+        }
+
+        const sender = room.state.players.find((player) => player.playerId === socket.data.playerId);
+
+        if (sender === undefined) {
+          socket.emit('error', {
+            code: 'NOT_IN_ROOM',
+            message: 'Player is not a member of the specified room.',
+          });
+          return;
+        }
+
+        const message = {
+          id: randomUUID(),
+          playerId: sender.playerId,
+          displayName: sender.displayName,
+          content: encodeHtml(trimmedContent),
+          timestamp: Date.now(),
+        };
+
+        const nextChatHistory = appendChatMessage(room.roomId, message);
+
+        updateRoomState(room.roomId, {
+          ...room.state,
+          chatMessages: nextChatHistory,
+        });
+
+        io.to(room.roomId).emit('chat_message', message);
+
         logger.debug(
-          { playerId: socket.data.playerId, roomId: payload?.roomId },
+          { playerId: socket.data.playerId, roomId: payload.roomId, messageId: message.id },
           'send_chat received',
         );
       } catch (err) {
@@ -768,6 +838,7 @@ export function registerSocketHandlers(
                 updateRoomState(activeRoom.roomId, finalState);
                 io.to(activeRoom.roomId).emit('game_over', finalState);
                 markRoomCompleted(activeRoom.roomId);
+                clearChatHistory(activeRoom.roomId);
 
                 for (const playerId of activeRoom.playerIds) {
                   clearReconnectToken(playerId);

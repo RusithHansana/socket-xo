@@ -29,6 +29,7 @@ function cloneGameState(state: GameState): GameState {
                 ? null
                 : state.outcome.winningLine.map((position) => ({ ...position })),
           },
+    chatMessages: (state.chatMessages ?? []).map((message) => ({ ...message })),
   };
 }
 
@@ -107,6 +108,7 @@ export function createWaitingRoom(playerId: string, playerInfo: PlayerInfo): Gam
       phase: 'waiting',
       outcome: null,
       moveCount: 0,
+      chatMessages: [],
     },
     createdAt: new Date().toISOString(),
     status: 'waiting',
