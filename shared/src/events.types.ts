@@ -28,6 +28,8 @@ export interface ClientToServerEvents {
   send_chat: (payload: { roomId: string; content: string }) => void;
   /** Attempt to reconnect an existing session */
   reconnect_attempt: (payload: { playerId: string; reconnectToken: string }) => void;
+  /** Create a shareable waiting room for direct join flow */
+  create_room: () => void;
   /** Join a specific room by link */
   join_room: (payload: { roomId: string; playerId: string }) => void;
 }
@@ -59,6 +61,8 @@ export interface ServerToClientEvents {
   reconnect_failed: (payload: { code: string; message: string }) => void;
   /** A chat message was broadcast to the room */
   chat_message: (message: ChatMessage) => void;
+  /** Waiting room successfully created */
+  room_created: (payload: { roomId: string }) => void;
   /** Generic error from the server */
   error: (payload: { code: string; message: string }) => void;
 }

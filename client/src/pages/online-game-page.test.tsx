@@ -14,6 +14,7 @@ const mockUseGuestIdentity = vi.fn();
 const mockUseSocket = vi.fn();
 const mockUseGameDispatch = vi.fn();
 const mockUseConnectionDispatch = vi.fn();
+const mockGetReconnectToken = vi.fn();
 
 vi.mock('../hooks/use-game-state', () => ({
   useGameState: () => mockUseGameState(),
@@ -38,6 +39,15 @@ vi.mock('../hooks/use-game-dispatch', () => ({
 vi.mock('../hooks/use-connection-dispatch', () => ({
   useConnectionDispatch: () => mockUseConnectionDispatch(),
 }));
+
+vi.mock('../services/reconnect-token-service', async () => {
+  const actual = await vi.importActual('../services/reconnect-token-service');
+
+  return {
+    ...actual,
+    getReconnectToken: (playerId: string) => mockGetReconnectToken(playerId),
+  };
+});
 
 type ActEnvironmentGlobal = typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean;
@@ -74,6 +84,7 @@ function createState(overrides: Partial<GameContextState> = {}): GameContextStat
     lastMoveError: null,
     opponentDisconnect: null,
     reconnectError: null,
+    roomError: null,
     ...overrides,
   };
 }
@@ -90,6 +101,7 @@ describe('OnlineGamePage', () => {
         {
           path: '/game/:roomId',
           loader: ({ params }) => ({ roomId: params.roomId ?? '' }),
+          HydrateFallback: () => null,
           element: <OnlineGamePage />,
         },
         {
@@ -129,6 +141,7 @@ describe('OnlineGamePage', () => {
     mockUseSocket.mockReturnValue({ emit: vi.fn() });
     mockUseGameDispatch.mockReturnValue(gameDispatch);
     mockUseConnectionDispatch.mockReturnValue(connectionDispatch);
+    mockGetReconnectToken.mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -146,17 +159,98 @@ describe('OnlineGamePage', () => {
     mockUseSocket.mockReset();
     mockUseGameDispatch.mockReset();
     mockUseConnectionDispatch.mockReset();
+    mockGetReconnectToken.mockReset();
     (globalThis as ActEnvironmentGlobal).IS_REACT_ACT_ENVIRONMENT = undefined;
     vi.restoreAllMocks();
   });
 
-  it('renders loading state while waiting for online game state', async () => {
-    mockUseGameState.mockReturnValue(createState({ phase: 'waiting' }));
+  it('emits join_room with route roomId when user is connected and not already in the room', async () => {
+    const emit = vi.fn();
+
+    mockUseSocket.mockReturnValue({ emit });
+    mockUseConnectionStatus.mockReturnValue({
+      status: 'connected',
+      searching: false,
+    } satisfies ConnectionState);
+    mockUseGameState.mockReturnValue(createState({ roomId: null, phase: 'waiting' }));
+
+    await renderPage('/game/room-link-42');
+
+    expect(emit).toHaveBeenCalledWith('join_room', {
+      roomId: 'room-link-42',
+      playerId: 'player-1',
+    });
+  });
+
+  it('does not emit join_room when already in the same room', async () => {
+    const emit = vi.fn();
+
+    mockUseSocket.mockReturnValue({ emit });
+    mockUseConnectionStatus.mockReturnValue({
+      status: 'connected',
+      searching: false,
+    } satisfies ConnectionState);
+    mockUseGameState.mockReturnValue(createState({ roomId: 'room-123', phase: 'waiting' }));
+
+    await renderPage('/game/room-123');
+
+    expect(emit).not.toHaveBeenCalledWith('join_room', expect.anything());
+  });
+
+  it('does not emit join_room when reconnect token exists', async () => {
+    const emit = vi.fn();
+
+    mockGetReconnectToken.mockReturnValue('token-abc');
+    mockUseSocket.mockReturnValue({ emit });
+    mockUseConnectionStatus.mockReturnValue({
+      status: 'connected',
+      searching: false,
+    } satisfies ConnectionState);
+    mockUseGameState.mockReturnValue(createState({ roomId: null, phase: 'waiting' }));
+
+    await renderPage('/game/room-link-42');
+
+    expect(emit).not.toHaveBeenCalledWith('join_room', expect.anything());
+  });
+
+  it('renders loading state while socket is still connecting', async () => {
+    mockUseGameState.mockReturnValue(createState({ phase: 'playing' }));
+    mockUseConnectionStatus.mockReturnValue({
+      status: 'connecting',
+      searching: false,
+    } satisfies ConnectionState);
 
     await renderPage();
 
     expect(container.textContent).toContain('Connecting');
     expect(container.textContent).toContain('Preparing your online match');
+  });
+
+  it('shows waiting-for-opponent state with room link and copy button', async () => {
+    mockUseGameState.mockReturnValue(createState({ phase: 'waiting', roomId: 'room-link-42' }));
+
+    await renderPage('/game/room-link-42');
+
+    expect(container.textContent).toContain('Waiting for opponent');
+    expect(container.textContent).toContain('/game/room-link-42');
+    expect(container.textContent).toContain('Copy Link');
+  });
+
+  it('shows room error card and go-to-lobby CTA for ROOM_NOT_FOUND', async () => {
+    mockUseGameState.mockReturnValue(
+      createState({
+        phase: 'waiting',
+        roomError: {
+          code: 'ROOM_NOT_FOUND',
+          message: "This room doesn't exist or has expired.",
+        },
+      }),
+    );
+
+    await renderPage();
+
+    expect(container.textContent).toContain("This room doesn't exist or has expired.");
+    expect(container.textContent).toContain('Go to Lobby');
   });
 
   it('renders board, players, and turn indicator from context state', async () => {
