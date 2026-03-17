@@ -316,6 +316,7 @@ export function applyMove(state: GameState, position: Position, symbol: Symbol):
     phase: outcome !== null ? 'finished' : 'playing',
     outcome,
     moveCount: newMoveCount,
+    chatMessages: state.chatMessages,
   };
 }
 

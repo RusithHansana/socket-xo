@@ -29,17 +29,20 @@ const baseGameState: GameState = {
   phase: 'playing',
   outcome: null,
   moveCount: 2,
+  chatMessages: [],
 };
 
 describe('gameReducer', () => {
   it('maps authoritative game state into context state', () => {
+    const { chatMessages: _chatMessages, ...authoritativeGameFields } = baseGameState;
+
     const nextState = gameReducer(getInitialGameState(), {
       type: 'GAME_START',
       payload: baseGameState,
     });
 
     expect(nextState).toEqual({
-      ...baseGameState,
+      ...authoritativeGameFields,
       lastMoveError: null,
       opponentDisconnect: null,
       reconnectError: null,

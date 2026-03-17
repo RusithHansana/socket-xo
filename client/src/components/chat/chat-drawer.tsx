@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, KeyboardEvent as ReactKeyboardEvent, TouchEvent } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, TouchEvent } from 'react';
 import { useChatMessages } from '../../hooks/use-chat-messages';
 import { useGuestIdentity } from '../../hooks/use-guest-identity';
 import { useGameState } from '../../hooks/use-game-state';

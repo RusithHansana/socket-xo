@@ -248,6 +248,7 @@ export default function OnlineGamePage() {
   const showReconnectSuccessOverlay =
     showRecoveredOverlay && gameState.phase === 'playing' && gameState.outcome === null;
   const showReconnectFailedOverlay = gameState.reconnectError !== null;
+  const isReconnectOverlayVisible = showDisconnectedOverlay || showReconnectSuccessOverlay || showReconnectFailedOverlay;
   const showOpponentDisconnectBanner =
     gameState.outcome === null && (gameState.opponentDisconnect !== null || showReconnectedBanner);
 
@@ -305,7 +306,7 @@ export default function OnlineGamePage() {
         />
       ) : null}
 
-      {showDisconnectedOverlay || showReconnectSuccessOverlay || showReconnectFailedOverlay ? (
+      {isReconnectOverlayVisible ? (
         <ReconnectOverlay
           gracePeriodMs={GRACE_PERIOD_MS}
           recovered={showReconnectSuccessOverlay}
@@ -315,7 +316,7 @@ export default function OnlineGamePage() {
         />
       ) : null}
 
-      <ChatDrawer disabled={status === 'disconnected' || status === 'reconnecting'} />
+      <ChatDrawer disabled={isReconnectOverlayVisible || status === 'reconnecting'} />
     </main>
   );
 }

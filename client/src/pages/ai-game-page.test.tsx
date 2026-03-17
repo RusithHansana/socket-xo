@@ -45,6 +45,7 @@ function createBaseState(): GameState {
     phase: 'playing',
     outcome: null,
     moveCount: 0,
+    chatMessages: [],
   };
 }
 

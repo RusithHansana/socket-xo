@@ -15,6 +15,7 @@ const mockUseSocket = vi.fn();
 const mockUseGameDispatch = vi.fn();
 const mockUseConnectionDispatch = vi.fn();
 const mockGetReconnectToken = vi.fn();
+const mockUseChatMessages = vi.fn();
 
 vi.mock('../hooks/use-game-state', () => ({
   useGameState: () => mockUseGameState(),
@@ -38,6 +39,10 @@ vi.mock('../hooks/use-game-dispatch', () => ({
 
 vi.mock('../hooks/use-connection-dispatch', () => ({
   useConnectionDispatch: () => mockUseConnectionDispatch(),
+}));
+
+vi.mock('../hooks/use-chat-messages', () => ({
+  useChatMessages: () => mockUseChatMessages(),
 }));
 
 vi.mock('../services/reconnect-token-service', async () => {
@@ -142,6 +147,7 @@ describe('OnlineGamePage', () => {
     mockUseGameDispatch.mockReturnValue(gameDispatch);
     mockUseConnectionDispatch.mockReturnValue(connectionDispatch);
     mockGetReconnectToken.mockReturnValue(null);
+    mockUseChatMessages.mockReturnValue({ messages: [] });
   });
 
   afterEach(() => {
@@ -160,6 +166,7 @@ describe('OnlineGamePage', () => {
     mockUseGameDispatch.mockReset();
     mockUseConnectionDispatch.mockReset();
     mockGetReconnectToken.mockReset();
+    mockUseChatMessages.mockReset();
     (globalThis as ActEnvironmentGlobal).IS_REACT_ACT_ENVIRONMENT = undefined;
     vi.restoreAllMocks();
   });
@@ -260,6 +267,9 @@ describe('OnlineGamePage', () => {
     expect(container.textContent).toContain('Player One');
     expect(container.textContent).toContain('Player Two');
     expect(container.textContent).toContain('Your Turn');
+    const openChatButton = container.querySelector('button[aria-label="Open chat"]') as HTMLButtonElement | null;
+    expect(openChatButton).not.toBeNull();
+    expect(openChatButton?.disabled).toBe(false);
   });
 
   it('emits make_move payload with roomId and position on cell click', async () => {
@@ -316,6 +326,8 @@ describe('OnlineGamePage', () => {
 
     expect(container.textContent).toContain('Reconnecting…');
     expect(container.textContent).toContain('0:30');
+    const openChatButton = container.querySelector('button[aria-label="Open chat"]') as HTMLButtonElement | null;
+    expect(openChatButton?.disabled).toBe(true);
   });
 
   it('shows reconnect failure overlay state with lobby action', async () => {

@@ -95,6 +95,7 @@ const sampleGameState: GameState = {
   phase: 'playing',
   outcome: null,
   moveCount: 2,
+  chatMessages: [],
 };
 
 describe('useSocketEvents', () => {
@@ -203,8 +204,8 @@ describe('useSocketEvents', () => {
     
     handlers.get('chat_message')?.({
       id: 'msg-1',
-      roomId: 'room-1',
       playerId: 'player-x',
+      displayName: 'Player X',
       content: 'hello',
       timestamp: 1234,
     });
@@ -212,8 +213,8 @@ describe('useSocketEvents', () => {
       type: 'CHAT_MESSAGE_RECEIVED',
       payload: {
         id: 'msg-1',
-        roomId: 'room-1',
         playerId: 'player-x',
+        displayName: 'Player X',
         content: 'hello',
         timestamp: 1234,
       },
