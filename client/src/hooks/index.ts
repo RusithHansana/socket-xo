@@ -3,6 +3,7 @@ export { useConnectionDispatch } from './use-connection-dispatch';
 export { useGameState } from './use-game-state';
 export { useGameDispatch } from './use-game-dispatch';
 export { useChatMessages } from './use-chat-messages';
+export { useChatDispatch } from './use-chat-dispatch';
 export { useGuestIdentity } from './use-guest-identity';
 export { useSocket } from './use-socket';
 export { useSocketEvents } from './use-socket-events';

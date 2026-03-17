@@ -7,5 +7,6 @@ export function useChatMessages(): ChatContextState {
   if (ctx === undefined) {
     throw new Error('useChatMessages must be used within a ChatProvider');
   }
-  return ctx;
+
+  return ctx.state;
 }
