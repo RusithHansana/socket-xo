@@ -10,6 +10,7 @@ import { useSocketEvents } from './use-socket-events';
 
 const mockUseConnectionDispatch = vi.fn();
 const mockUseGameDispatch = vi.fn();
+const mockUseChatDispatch = vi.fn();
 const mockGetReconnectToken = vi.fn();
 const mockStoreReconnectToken = vi.fn();
 const mockClearReconnectToken = vi.fn();
@@ -20,6 +21,10 @@ vi.mock('./use-connection-dispatch', () => ({
 
 vi.mock('./use-game-dispatch', () => ({
   useGameDispatch: () => mockUseGameDispatch(),
+}));
+
+vi.mock('./use-chat-dispatch', () => ({
+  useChatDispatch: () => mockUseChatDispatch(),
 }));
 
 vi.mock('../services/reconnect-token-service', () => ({
