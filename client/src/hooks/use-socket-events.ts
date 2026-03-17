@@ -1,7 +1,8 @@
 import { useLayoutEffect } from 'react';
-import type { GameState } from 'shared';
+import type { GameState, ChatMessage } from 'shared';
 import { useConnectionDispatch } from './use-connection-dispatch';
 import { useGameDispatch } from './use-game-dispatch';
+import { useChatDispatch } from './use-chat-dispatch';
 import type { TypedSocket } from '../services/socket-service';
 import {
   clearReconnectToken,
@@ -14,6 +15,7 @@ const ROOM_ERROR_CODES = new Set(['ROOM_NOT_FOUND', 'ROOM_FULL', 'GAME_ENDED', '
 export function useSocketEvents(socket: TypedSocket | null, playerId: string): void {
   const connectionDispatch = useConnectionDispatch();
   const gameDispatch = useGameDispatch();
+  const chatDispatch = useChatDispatch();
 
   useLayoutEffect(() => {
     if (socket === null) {
@@ -47,10 +49,12 @@ export function useSocketEvents(socket: TypedSocket | null, playerId: string): v
     const handleGameStart = (state: GameState) => {
       connectionDispatch({ type: 'SET_IN_GAME' });
       gameDispatch({ type: 'GAME_START', payload: state });
+      chatDispatch({ type: 'CHAT_SNAPSHOT_REPLACED', payload: state.chatMessages });
     };
 
     const handleGameStateUpdate = (state: GameState) => {
       gameDispatch({ type: 'GAME_STATE_UPDATE', payload: state });
+      chatDispatch({ type: 'CHAT_SNAPSHOT_REPLACED', payload: state.chatMessages });
     };
 
     const handleMoveRejected = (payload: { code: string; message: string }) => {
@@ -80,6 +84,7 @@ export function useSocketEvents(socket: TypedSocket | null, playerId: string): v
       connectionDispatch({ type: 'SET_IN_GAME' });
       gameDispatch({ type: 'GAME_STATE_UPDATE', payload: state });
       gameDispatch({ type: 'OPPONENT_RECONNECTED' });
+      chatDispatch({ type: 'CHAT_SNAPSHOT_REPLACED', payload: state.chatMessages });
     };
 
     const handleReconnectFailed = (payload: { code: string; message: string }) => {
@@ -100,6 +105,10 @@ export function useSocketEvents(socket: TypedSocket | null, playerId: string): v
       console.error('Socket server error', payload);
     };
 
+    const handleChatMessage = (message: ChatMessage) => {
+      chatDispatch({ type: 'CHAT_MESSAGE_RECEIVED', payload: message });
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('connect_error', handleConnectError);
@@ -114,6 +123,7 @@ export function useSocketEvents(socket: TypedSocket | null, playerId: string): v
     socket.on('reconnect_success', handleReconnectSuccess);
     socket.on('reconnect_failed', handleReconnectFailed);
     socket.on('reconnect_token', handleReconnectToken);
+    socket.on('chat_message', handleChatMessage);
     socket.on('error', handleError);
 
     return () => {
@@ -131,7 +141,8 @@ export function useSocketEvents(socket: TypedSocket | null, playerId: string): v
       socket.off('reconnect_success', handleReconnectSuccess);
       socket.off('reconnect_failed', handleReconnectFailed);
       socket.off('reconnect_token', handleReconnectToken);
+      socket.off('chat_message', handleChatMessage);
       socket.off('error', handleError);
     };
-  }, [connectionDispatch, gameDispatch, playerId, socket]);
+  }, [connectionDispatch, gameDispatch, chatDispatch, playerId, socket]);
 }
