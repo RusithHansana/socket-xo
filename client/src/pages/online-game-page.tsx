@@ -7,6 +7,7 @@ import { GameOutcomeModal } from '../components/game/game-outcome-modal';
 import { PlayerIdentity } from '../components/game/player-identity';
 import { ReconnectOverlay } from '../components/game/reconnect-overlay';
 import { TurnIndicator } from '../components/game/turn-indicator';
+import { ChatDrawer } from '../components/chat/chat-drawer';
 import { useConnectionDispatch } from '../hooks/use-connection-dispatch';
 import { useConnectionStatus } from '../hooks/use-connection-status';
 import { useGameDispatch } from '../hooks/use-game-dispatch';
@@ -313,6 +314,8 @@ export default function OnlineGamePage() {
           onRecovered={() => setShowRecoveredOverlay(false)}
         />
       ) : null}
+
+      <ChatDrawer disabled={status === 'disconnected' || status === 'reconnecting'} />
     </main>
   );
 }
