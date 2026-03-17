@@ -570,6 +570,26 @@ describe('registerSocketHandlers send_chat', () => {
     );
   });
 
+  it('rejects send_chat with content exceeding 256 characters', () => {
+    const io = createIo();
+    const socket = createSocket('player-1', 'room-1');
+    const roomState = createState({ roomId: 'room-1' });
+
+    mockGetRoom.mockReturnValue(createRoom(roomState));
+
+    registerSocketHandlers(io as never);
+    connectSocket(io, socket);
+
+    const longMessage = 'a'.repeat(257);
+    triggerSendChat(socket, { roomId: 'room-1', content: longMessage });
+
+    expect(socket.emit).toHaveBeenCalledWith('error', {
+      code: 'INVALID_PAYLOAD',
+      message: 'Chat message content is too long (maximum 256 characters).',
+    });
+    expect(mockAppendChatMessage).not.toHaveBeenCalled();
+  });
+
   it('5.1.3 — rejects send_chat for players outside the room with structured error', () => {
     const io = createIo();
     const socket = createSocket('outside-player', null);

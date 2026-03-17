@@ -410,6 +410,14 @@ export function registerSocketHandlers(
           return;
         }
 
+        if (trimmedContent.length > 256) {
+          socket.emit('error', {
+            code: 'INVALID_PAYLOAD',
+            message: 'Chat message content is too long (maximum 256 characters).',
+          });
+          return;
+        }
+
         const room = getRoom(payload.roomId);
 
         if (room === null) {
