@@ -116,6 +116,7 @@ describe('useSocketEvents', () => {
     container.remove();
     mockUseConnectionDispatch.mockReset();
     mockUseGameDispatch.mockReset();
+    mockUseChatDispatch.mockReset();
     mockGetReconnectToken.mockReset();
     mockStoreReconnectToken.mockReset();
     mockClearReconnectToken.mockReset();
@@ -126,10 +127,12 @@ describe('useSocketEvents', () => {
   it('registers central socket listeners and dispatches connection and game actions', () => {
     const connectionDispatch = vi.fn();
     const gameDispatch = vi.fn();
+    const chatDispatch = vi.fn();
     const { socket, handlers } = createMockSocket();
 
     mockUseConnectionDispatch.mockReturnValue(connectionDispatch);
     mockUseGameDispatch.mockReturnValue(gameDispatch);
+    mockUseChatDispatch.mockReturnValue(chatDispatch);
 
     root = createRoot(container);
     mockGetReconnectToken.mockReturnValue(null);
