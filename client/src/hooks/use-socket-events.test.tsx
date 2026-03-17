@@ -197,10 +197,16 @@ describe('useSocketEvents', () => {
     expect(mockClearReconnectToken).toHaveBeenCalledWith('player-x');
     
     // Chat assertions
-    expect(chatDispatch).toHaveBeenCalledWith({
-      type: 'CHAT_SNAPSHOT_REPLACED',
-      payload: sampleGameState.chatMessages,
-    });
+    const snapshotReplaceCalls = chatDispatch.mock.calls.filter(
+      ([action]) => action?.type === 'CHAT_SNAPSHOT_REPLACED',
+    );
+
+    expect(snapshotReplaceCalls).toHaveLength(3);
+    expect(snapshotReplaceCalls).toEqual([
+      [{ type: 'CHAT_SNAPSHOT_REPLACED', payload: sampleGameState.chatMessages }],
+      [{ type: 'CHAT_SNAPSHOT_REPLACED', payload: sampleGameState.chatMessages }],
+      [{ type: 'CHAT_SNAPSHOT_REPLACED', payload: sampleGameState.chatMessages }],
+    ]);
     
     handlers.get('chat_message')?.({
       id: 'msg-1',
