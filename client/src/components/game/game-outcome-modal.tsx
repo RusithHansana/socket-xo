@@ -63,8 +63,10 @@ export function GameOutcomeModal({
 
   useEffect(() => {
     buttonRef.current?.focus();
-    // Setting text in useEffect ensures screen readers pick up the dynamic injection
-    setAnnouncedHeading(copy.heading);
+    // Setting text asynchronously in useEffect ensures screen readers pick up the dynamic injection without sync setState
+    const timer = window.setTimeout(() => {
+      setAnnouncedHeading(copy.heading);
+    }, 50);
 
     const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -76,6 +78,7 @@ export function GameOutcomeModal({
     document.addEventListener('keydown', handleGlobalKeyDown);
     return () => {
       document.removeEventListener('keydown', handleGlobalKeyDown);
+      window.clearTimeout(timer);
     };
   }, [copy.heading, onBackToLobby]);
 

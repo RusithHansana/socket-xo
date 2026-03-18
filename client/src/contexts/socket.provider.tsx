@@ -10,18 +10,30 @@ import { useSocketEvents } from '../hooks/use-socket-events';
 export function SocketProvider({ children }: { children: ReactNode }) {
   const { playerId, displayName, avatarUrl } = useGuestIdentity();
   const dispatch = useConnectionDispatch();
-  const [socket, setSocket] = useState<TypedSocket | null>(null);
+  const [socket, setSocket] = useState<TypedSocket | null>(() => 
+    createSocketConnection(playerId, displayName, avatarUrl)
+  );
+  const [prevDeps, setPrevDeps] = useState({ playerId, displayName, avatarUrl });
+
+  if (
+    playerId !== prevDeps.playerId ||
+    displayName !== prevDeps.displayName ||
+    avatarUrl !== prevDeps.avatarUrl
+  ) {
+    setPrevDeps({ playerId, displayName, avatarUrl });
+    setSocket(createSocketConnection(playerId, displayName, avatarUrl));
+  }
 
   useEffect(() => {
-    const nextSocket = createSocketConnection(playerId, displayName, avatarUrl);
-    setSocket(nextSocket);
+    if (!socket) return;
+    
     dispatch({ type: 'SET_CONNECTING' });
-    nextSocket.connect();
+    socket.connect();
 
     return () => {
-      nextSocket.disconnect();
+      socket.disconnect();
     };
-  }, [avatarUrl, dispatch, displayName, playerId]);
+  }, [socket, dispatch]);
 
   useSocketEvents(socket, playerId);
 

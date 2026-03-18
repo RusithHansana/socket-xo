@@ -10,6 +10,7 @@ import { useSocketEvents } from './use-socket-events';
 
 const mockUseConnectionDispatch = vi.fn();
 const mockUseGameDispatch = vi.fn();
+const mockUseChatDispatch = vi.fn();
 const mockGetReconnectToken = vi.fn();
 const mockStoreReconnectToken = vi.fn();
 const mockClearReconnectToken = vi.fn();
@@ -20,6 +21,10 @@ vi.mock('./use-connection-dispatch', () => ({
 
 vi.mock('./use-game-dispatch', () => ({
   useGameDispatch: () => mockUseGameDispatch(),
+}));
+
+vi.mock('./use-chat-dispatch', () => ({
+  useChatDispatch: () => mockUseChatDispatch(),
 }));
 
 vi.mock('../services/reconnect-token-service', () => ({
@@ -90,6 +95,7 @@ const sampleGameState: GameState = {
   phase: 'playing',
   outcome: null,
   moveCount: 2,
+  chatMessages: [],
 };
 
 describe('useSocketEvents', () => {
@@ -111,6 +117,7 @@ describe('useSocketEvents', () => {
     container.remove();
     mockUseConnectionDispatch.mockReset();
     mockUseGameDispatch.mockReset();
+    mockUseChatDispatch.mockReset();
     mockGetReconnectToken.mockReset();
     mockStoreReconnectToken.mockReset();
     mockClearReconnectToken.mockReset();
@@ -121,10 +128,12 @@ describe('useSocketEvents', () => {
   it('registers central socket listeners and dispatches connection and game actions', () => {
     const connectionDispatch = vi.fn();
     const gameDispatch = vi.fn();
+    const chatDispatch = vi.fn();
     const { socket, handlers } = createMockSocket();
 
     mockUseConnectionDispatch.mockReturnValue(connectionDispatch);
     mockUseGameDispatch.mockReturnValue(gameDispatch);
+    mockUseChatDispatch.mockReturnValue(chatDispatch);
 
     root = createRoot(container);
     mockGetReconnectToken.mockReturnValue(null);
@@ -183,8 +192,39 @@ describe('useSocketEvents', () => {
       type: 'RECONNECT_FAILED',
       payload: { code: 'SESSION_NOT_FOUND', message: 'Session missing' },
     });
+    expect(mockGetReconnectToken).toHaveBeenCalledWith('player-x');
     expect(mockStoreReconnectToken).toHaveBeenCalledWith('player-x', 'token-1');
     expect(mockClearReconnectToken).toHaveBeenCalledWith('player-x');
+    
+    // Chat assertions
+    const snapshotReplaceCalls = chatDispatch.mock.calls.filter(
+      ([action]) => action?.type === 'CHAT_SNAPSHOT_REPLACED',
+    );
+
+    expect(snapshotReplaceCalls).toHaveLength(3);
+    expect(snapshotReplaceCalls).toEqual([
+      [{ type: 'CHAT_SNAPSHOT_REPLACED', payload: sampleGameState.chatMessages }],
+      [{ type: 'CHAT_SNAPSHOT_REPLACED', payload: sampleGameState.chatMessages }],
+      [{ type: 'CHAT_SNAPSHOT_REPLACED', payload: sampleGameState.chatMessages }],
+    ]);
+    
+    handlers.get('chat_message')?.({
+      id: 'msg-1',
+      playerId: 'player-x',
+      displayName: 'Player X',
+      content: 'hello',
+      timestamp: 1234,
+    });
+    expect(chatDispatch).toHaveBeenCalledWith({
+      type: 'CHAT_MESSAGE_RECEIVED',
+      payload: {
+        id: 'msg-1',
+        playerId: 'player-x',
+        displayName: 'Player X',
+        content: 'hello',
+        timestamp: 1234,
+      },
+    });
   });
 
   it('emits reconnect_attempt and transitions to reconnecting on connect when token exists', () => {

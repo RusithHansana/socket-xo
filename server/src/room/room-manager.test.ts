@@ -50,6 +50,7 @@ function createFinishedState(roomId: string): GameState {
       ],
     },
     moveCount: 5,
+    chatMessages: [],
   };
 }
 

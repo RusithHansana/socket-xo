@@ -7,6 +7,7 @@ import { GameOutcomeModal } from '../components/game/game-outcome-modal';
 import { PlayerIdentity } from '../components/game/player-identity';
 import { ReconnectOverlay } from '../components/game/reconnect-overlay';
 import { TurnIndicator } from '../components/game/turn-indicator';
+import { ChatDrawer } from '../components/chat/chat-drawer';
 import { useConnectionDispatch } from '../hooks/use-connection-dispatch';
 import { useConnectionStatus } from '../hooks/use-connection-status';
 import { useGameDispatch } from '../hooks/use-game-dispatch';
@@ -60,8 +61,53 @@ export default function OnlineGamePage() {
   const [showReconnectedBanner, setShowReconnectedBanner] = useState(false);
   const joinAttemptedRef = useRef(false);
   const [copyLabel, setCopyLabel] = useState<'copy' | 'copied' | 'failed'>('copy');
-  const previousStatusRef = useRef(status);
-  const previousOpponentDisconnectRef = useRef(gameState.opponentDisconnect);
+
+  const [prevGameData, setPrevGameData] = useState({
+    opponentDisconnect: gameState.opponentDisconnect,
+    outcome: gameState.outcome,
+    status,
+    phase: gameState.phase
+  });
+
+  if (
+    gameState.opponentDisconnect !== prevGameData.opponentDisconnect ||
+    gameState.outcome !== prevGameData.outcome ||
+    status !== prevGameData.status ||
+    gameState.phase !== prevGameData.phase
+  ) {
+    const previousOpponentDisconnect = prevGameData.opponentDisconnect;
+    const previousStatus = prevGameData.status;
+
+    let nextShowReconnectedBanner = showReconnectedBanner;
+    if (gameState.opponentDisconnect === null && previousOpponentDisconnect !== null && gameState.outcome === null) {
+      nextShowReconnectedBanner = true;
+    }
+    if (gameState.opponentDisconnect !== null || gameState.outcome !== null) {
+      nextShowReconnectedBanner = false;
+    }
+
+    let nextShowRecoveredOverlay = showRecoveredOverlay;
+    if (status === 'disconnected' || status === 'game_over' || gameState.outcome !== null) {
+      nextShowRecoveredOverlay = false;
+    } else if (
+      previousStatus === 'disconnected' &&
+      status === 'in_game' &&
+      gameState.phase === 'playing' &&
+      gameState.outcome === null
+    ) {
+      nextShowRecoveredOverlay = true;
+    }
+
+    setPrevGameData({
+      opponentDisconnect: gameState.opponentDisconnect,
+      outcome: gameState.outcome,
+      status,
+      phase: gameState.phase
+    });
+    
+    setShowReconnectedBanner(nextShowReconnectedBanner);
+    setShowRecoveredOverlay(nextShowRecoveredOverlay);
+  }
 
   useEffect(() => {
     joinAttemptedRef.current = false;
@@ -83,47 +129,6 @@ export default function OnlineGamePage() {
     socket.emit('join_room', { roomId, playerId });
     joinAttemptedRef.current = true;
   }, [gameState.roomId, playerId, roomId, socket, status]);
-
-  useEffect(() => {
-    const previousOpponentDisconnect = previousOpponentDisconnectRef.current;
-
-    if (gameState.opponentDisconnect === null && previousOpponentDisconnect !== null && gameState.outcome === null) {
-      setShowReconnectedBanner(true);
-    }
-
-    if (gameState.opponentDisconnect !== null) {
-      setShowReconnectedBanner(false);
-    }
-
-    if (gameState.outcome !== null) {
-      setShowReconnectedBanner(false);
-    }
-
-    previousOpponentDisconnectRef.current = gameState.opponentDisconnect;
-  }, [gameState.opponentDisconnect, gameState.outcome]);
-
-  useEffect(() => {
-    const previousStatus = previousStatusRef.current;
-
-    if (status === 'disconnected') {
-      setShowRecoveredOverlay(false);
-    }
-
-    if (
-      previousStatus === 'disconnected'
-      && status === 'in_game'
-      && gameState.phase === 'playing'
-      && gameState.outcome === null
-    ) {
-      setShowRecoveredOverlay(true);
-    }
-
-    if (status === 'game_over' || gameState.outcome !== null) {
-      setShowRecoveredOverlay(false);
-    }
-
-    previousStatusRef.current = status;
-  }, [gameState.outcome, gameState.phase, status]);
 
   const activeRoomId = gameState.roomId ?? roomId;
   const myPlayer = gameState.players.find((player) => player.playerId === playerId);
@@ -247,6 +252,7 @@ export default function OnlineGamePage() {
   const showReconnectSuccessOverlay =
     showRecoveredOverlay && gameState.phase === 'playing' && gameState.outcome === null;
   const showReconnectFailedOverlay = gameState.reconnectError !== null;
+  const isReconnectOverlayVisible = showDisconnectedOverlay || showReconnectSuccessOverlay || showReconnectFailedOverlay;
   const showOpponentDisconnectBanner =
     gameState.outcome === null && (gameState.opponentDisconnect !== null || showReconnectedBanner);
 
@@ -304,7 +310,7 @@ export default function OnlineGamePage() {
         />
       ) : null}
 
-      {showDisconnectedOverlay || showReconnectSuccessOverlay || showReconnectFailedOverlay ? (
+      {isReconnectOverlayVisible ? (
         <ReconnectOverlay
           gracePeriodMs={GRACE_PERIOD_MS}
           recovered={showReconnectSuccessOverlay}
@@ -313,6 +319,8 @@ export default function OnlineGamePage() {
           onRecovered={() => setShowRecoveredOverlay(false)}
         />
       ) : null}
+
+      <ChatDrawer disabled={isReconnectOverlayVisible || status === 'reconnecting'} />
     </main>
   );
 }

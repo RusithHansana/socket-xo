@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type AnimationEvent } from 'react';
+import { useState, type AnimationEvent } from 'react';
 import type { Symbol } from 'shared';
 import styles from './game-cell.module.css';
 
@@ -48,13 +48,13 @@ export function GameCell({
 }: GameCellProps) {
   const [isShaking, setIsShaking] = useState(false);
   const [shouldAnimateSymbol, setShouldAnimateSymbol] = useState(false);
-  const previousValueRef = useRef<Symbol | null>(value);
+  const [prevValue, setPrevValue] = useState<Symbol | null>(value);
 
-  useEffect(() => {
-    const shouldAnimate = previousValueRef.current === null && value !== null;
+  if (value !== prevValue) {
+    const shouldAnimate = prevValue === null && value !== null;
     setShouldAnimateSymbol(shouldAnimate);
-    previousValueRef.current = value;
-  }, [value]);
+    setPrevValue(value);
+  }
 
   const triggerShake = () => {
     setIsShaking(true);

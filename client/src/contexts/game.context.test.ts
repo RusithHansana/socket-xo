@@ -29,6 +29,7 @@ const baseGameState: GameState = {
   phase: 'playing',
   outcome: null,
   moveCount: 2,
+  chatMessages: [],
 };
 
 describe('gameReducer', () => {
@@ -39,7 +40,13 @@ describe('gameReducer', () => {
     });
 
     expect(nextState).toEqual({
-      ...baseGameState,
+      roomId: baseGameState.roomId,
+      board: baseGameState.board,
+      currentTurn: baseGameState.currentTurn,
+      players: baseGameState.players,
+      phase: baseGameState.phase,
+      outcome: baseGameState.outcome,
+      moveCount: baseGameState.moveCount,
       lastMoveError: null,
       opponentDisconnect: null,
       reconnectError: null,

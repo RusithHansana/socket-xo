@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import { SocketContext } from '../contexts/socket.context';
 import type { TypedSocket } from '../services/socket-service';
 
@@ -13,8 +13,11 @@ export function useSocket(): TypedSocket | null {
   if (socket === undefined) {
     throw new Error('useSocket must be used within a SocketProvider');
   }
-  // TODO: Remove in production - only for testing purposes.
-  window.socket = socket;
+  
+  useEffect(() => {
+    // TODO: Remove in production - only for testing purposes.
+    window.socket = socket;
+  }, [socket]);
 
   return socket;
 }

@@ -63,20 +63,24 @@ export default function LobbyPage() {
   const connectionDispatch = useConnectionDispatch();
   const gameState = useGameState();
   const socket = useSocket();
-  const [matchedRoomId, setMatchedRoomId] = useState<string | null>(null);
+  const [matchedRoomId, setMatchedRoomId] = useState<string | null>(
+    status === 'in_game' && gameState.roomId !== null ? gameState.roomId : null
+  );
   const [matchMode, setMatchMode] = useState<'matchmaking' | 'create_room'>('matchmaking');
+  const [prevGameState, setPrevGameState] = useState({ status, roomId: gameState.roomId });
+
+  if (status !== prevGameState.status || gameState.roomId !== prevGameState.roomId) {
+    setPrevGameState({ status, roomId: gameState.roomId });
+    if (status === 'in_game' && gameState.roomId !== null) {
+      setMatchedRoomId(gameState.roomId);
+    } else {
+      setMatchedRoomId(null);
+    }
+  }
+
   const isLoading = status === 'idle' || status === 'connecting';
   const showMatched = matchedRoomId !== null;
   const showMatchmaking = searching || showMatched;
-
-  useEffect(() => {
-    if (status === 'in_game' && gameState.roomId !== null) {
-      setMatchedRoomId(gameState.roomId);
-      return;
-    }
-
-    setMatchedRoomId(null);
-  }, [gameState.roomId, status]);
 
   useEffect(() => {
     if (matchedRoomId === null) {

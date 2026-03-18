@@ -1,0 +1,79 @@
+.messageWrapper {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  align-items: flex-end;
+}
+
+.messageMe {
+  flex-direction: row-reverse;
+}
+
+.messageOpponent {
+  flex-direction: row;
+}
+
+.avatar {
+  width: var(--space-xl);
+  height: var(--space-xl);
+  border-radius: var(--radius-full);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.messageContent {
+  display: flex;
+  flex-direction: column;
+  max-width: 75%;
+}
+
+.messageMe .messageContent {
+  align-items: flex-end;
+}
+
+.header {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: baseline;
+  margin-bottom: var(--space-xs);
+  color: var(--color-text-secondary);
+  font: var(--font-caption);
+}
+
+.messageMe .header {
+  flex-direction: row-reverse;
+}
+
+.name {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.time {
+  font-size: 0.7rem;
+}
+
+.text {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-lg);
+  font: var(--font-body-sm);
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.messageMe .text {
+  background-color: var(--color-primary);
+  color: var(--color-bg-primary);
+  border-bottom-right-radius: var(--radius-sm);
+}
+
+.messageOpponent .text {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-bottom-left-radius: var(--radius-sm);
+}

@@ -155,11 +155,18 @@ describe('GameOutcomeModal', () => {
   });
 
   it('7.13 — has an assertive live region with the outcome text', () => {
+    vi.useFakeTimers();
     renderModal();
 
     const liveRegion = container.querySelector('[aria-live="assertive"]');
 
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+
     expect(liveRegion?.textContent).toBe('You Win!');
+    
+    vi.useRealTimers();
   });
 
   it('7.14 — focuses the Back to Lobby button after mount', () => {
