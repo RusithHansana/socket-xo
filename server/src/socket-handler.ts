@@ -18,12 +18,14 @@ import {
   getGameState,
   getRoom,
   getRoomByPlayerId,
+  markRoomAbandoned,
   markRoomCompleted,
   updateRoomState,
 } from './room/room-manager.js';
 import { appendChatMessage, clearChatHistory } from './chat/chat-handler.js';
 import { cancelGraceTimer, startGraceTimer } from './room/grace-timer.js';
 import {
+  clearSessionRoomAssignments,
   clearReconnectToken,
   getSession,
   issueReconnectToken,
@@ -368,6 +370,8 @@ export function registerSocketHandlers(
             clearReconnectToken(playerId);
             disconnectStartedAtMs.delete(playerId);
           }
+
+          clearSessionRoomAssignments(room.playerIds);
         }
 
         logger.debug(
@@ -818,6 +822,10 @@ export function registerSocketHandlers(
               gracePeriodMs: config.gracePeriodMs,
             });
 
+            if (disconnectedState.players.every((player) => !player.connected)) {
+              markRoomAbandoned(room.roomId);
+            }
+
             disconnectStartedAtMs.set(session.playerId, Date.now());
 
             startGraceTimer(session.playerId, config.gracePeriodMs, () => {
@@ -852,6 +860,8 @@ export function registerSocketHandlers(
                   clearReconnectToken(playerId);
                   disconnectStartedAtMs.delete(playerId);
                 }
+
+                clearSessionRoomAssignments(activeRoom.playerIds);
               } catch (err) {
                 logger.error(
                   {

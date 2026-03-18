@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { MAX_PLAYERS_PER_ROOM, type GameState, type PlayerInfo } from 'shared';
 import { createGame } from '../game/game-engine.js';
+import { logger } from '../utils/logger.js';
 import type { GameRoom } from './room.types.js';
 
 type RoomError = {
@@ -13,6 +14,28 @@ type AddPlayerToRoomResult =
   | { success: false; error: RoomError };
 
 const rooms = new Map<string, GameRoom>();
+const roomRemovalTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+let roomSweepInterval: ReturnType<typeof setInterval> | null = null;
+
+export const ROOM_COMPLETION_CLEANUP_DELAY_MS = 5_000;
+export const ROOM_ORPHAN_MAX_AGE_MS = 10 * 60 * 1_000;
+
+type RoomRemovalReason = 'completed' | 'abandoned';
+
+type RoomSweepOptions = {
+  orphanAgeMs?: number;
+  nowMs?: number;
+};
+
+type RoomSweepLifecycleOptions = {
+  intervalMs: number;
+  orphanAgeMs?: number;
+};
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
 
 function cloneGameState(state: GameState): GameState {
   return {
@@ -75,12 +98,16 @@ export function createRoom(
 
   const roomId = randomUUID();
   const players = assignSymbols(player1Info, player2Info);
+  const createdAt = nowIso();
   const room: GameRoom = {
     roomId,
     playerIds: [player1Id, player2Id],
     state: createGame(roomId, players),
-    createdAt: new Date().toISOString(),
+    createdAt,
     status: 'active',
+    completedAt: null,
+    abandonedAt: null,
+    lastActivityAt: createdAt,
   };
 
   rooms.set(roomId, room);
@@ -93,6 +120,7 @@ export function createWaitingRoom(playerId: string, playerInfo: PlayerInfo): Gam
   }
 
   const roomId = randomUUID();
+  const createdAt = nowIso();
   const room: GameRoom = {
     roomId,
     playerIds: [playerId],
@@ -110,8 +138,11 @@ export function createWaitingRoom(playerId: string, playerInfo: PlayerInfo): Gam
       moveCount: 0,
       chatMessages: [],
     },
-    createdAt: new Date().toISOString(),
+    createdAt,
     status: 'waiting',
+    completedAt: null,
+    abandonedAt: null,
+    lastActivityAt: createdAt,
   };
 
   rooms.set(roomId, room);
@@ -218,10 +249,22 @@ export function updateRoomState(roomId: string, newState: GameState): GameRoom |
     return null;
   }
 
+  const nextStatus =
+    newState.phase === 'finished'
+      ? 'completed'
+      : room.playerIds.length < MAX_PLAYERS_PER_ROOM || newState.phase === 'waiting'
+        ? 'waiting'
+        : 'active';
+
+  const completedAt = nextStatus === 'completed' ? room.completedAt ?? nowIso() : null;
+
   const updatedRoom: GameRoom = {
     ...room,
     state: cloneGameState(newState),
-    status: newState.phase === 'finished' ? 'completed' : 'active',
+    status: nextStatus,
+    completedAt,
+    abandonedAt: nextStatus === 'completed' ? room.abandonedAt : null,
+    lastActivityAt: nowIso(),
   };
 
   rooms.set(roomId, updatedRoom);
@@ -241,16 +284,133 @@ export function markRoomCompleted(roomId: string): GameRoom | null {
     return null;
   }
 
+  const completedAt = room.completedAt ?? nowIso();
   const updatedRoom: GameRoom = {
     ...room,
     status: 'completed',
+    completedAt,
+    abandonedAt: null,
+    lastActivityAt: completedAt,
+  };
+
+  rooms.set(roomId, updatedRoom);
+  scheduleRoomRemoval(roomId, ROOM_COMPLETION_CLEANUP_DELAY_MS, 'completed');
+  return cloneRoom(updatedRoom);
+}
+
+export function markRoomAbandoned(roomId: string): GameRoom | null {
+  const room = getStoredRoom(roomId);
+
+  if (room === null) {
+    return null;
+  }
+
+  const abandonedAt = room.abandonedAt ?? nowIso();
+  const updatedRoom: GameRoom = {
+    ...room,
+    abandonedAt,
+    lastActivityAt: abandonedAt,
   };
 
   rooms.set(roomId, updatedRoom);
   return cloneRoom(updatedRoom);
 }
 
+export function scheduleRoomRemoval(
+  roomId: string,
+  delayMs: number,
+  reason: RoomRemovalReason,
+): boolean {
+  const room = getStoredRoom(roomId);
+
+  if (room === null) {
+    return false;
+  }
+
+  const existingTimer = roomRemovalTimers.get(roomId);
+  if (existingTimer !== undefined) {
+    clearTimeout(existingTimer);
+  }
+
+  const timer = setTimeout(() => {
+    removeRoom(roomId);
+    logger.info(
+      {
+        roomId,
+        reason,
+        ageMs: Date.now() - Date.parse(room.createdAt),
+      },
+      'Removed room from memory',
+    );
+  }, delayMs);
+
+  roomRemovalTimers.set(roomId, timer);
+  return true;
+}
+
+export function runRoomSweepOnce(options: RoomSweepOptions = {}): number {
+  const nowMs = options.nowMs ?? Date.now();
+  const orphanAgeMs = options.orphanAgeMs ?? ROOM_ORPHAN_MAX_AGE_MS;
+  const roomsToRemove: Array<{ roomId: string; reason: 'abandoned' | 'completed'; ageMs: number }> = [];
+
+  for (const room of rooms.values()) {
+    const abandonedAtMs = room.abandonedAt === null ? null : Date.parse(room.abandonedAt);
+    const completedAtMs = room.completedAt === null ? null : Date.parse(room.completedAt);
+
+    if (abandonedAtMs !== null) {
+      const ageMs = nowMs - abandonedAtMs;
+      if (ageMs >= orphanAgeMs) {
+        roomsToRemove.push({ roomId: room.roomId, reason: 'abandoned', ageMs });
+      }
+      continue;
+    }
+
+    if (room.status === 'completed' && completedAtMs !== null) {
+      const ageMs = nowMs - completedAtMs;
+      if (ageMs >= orphanAgeMs) {
+        roomsToRemove.push({ roomId: room.roomId, reason: 'completed', ageMs });
+      }
+    }
+  }
+
+  for (const room of roomsToRemove) {
+    removeRoom(room.roomId);
+    logger.info(
+      {
+        roomId: room.roomId,
+        reason: room.reason,
+        ageMs: room.ageMs,
+      },
+      'Removed orphaned room during periodic sweep',
+    );
+  }
+
+  return roomsToRemove.length;
+}
+
+export function startRoomSweep(options: RoomSweepLifecycleOptions): void {
+  stopRoomSweep();
+
+  const orphanAgeMs = options.orphanAgeMs ?? ROOM_ORPHAN_MAX_AGE_MS;
+  roomSweepInterval = setInterval(() => {
+    runRoomSweepOnce({ orphanAgeMs });
+  }, options.intervalMs);
+}
+
+export function stopRoomSweep(): void {
+  if (roomSweepInterval !== null) {
+    clearInterval(roomSweepInterval);
+    roomSweepInterval = null;
+  }
+}
+
 export function removeRoom(roomId: string): boolean {
+  const timer = roomRemovalTimers.get(roomId);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    roomRemovalTimers.delete(roomId);
+  }
+
   return rooms.delete(roomId);
 }
 
@@ -268,6 +428,10 @@ export function clearAllRooms(): void {
   if (process.env.NODE_ENV !== 'test') {
     throw new Error('clearAllRooms is a test-only helper and cannot be used in production.');
   }
-
+  for (const timer of roomRemovalTimers.values()) {
+    clearTimeout(timer);
+  }
+  roomRemovalTimers.clear();
+  stopRoomSweep();
   rooms.clear();
 }

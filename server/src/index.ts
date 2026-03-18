@@ -5,6 +5,7 @@ import path from 'path';
 import { config } from './config.js';
 import { logger } from './utils/logger.js';
 import { registerSocketHandlers } from './socket-handler.js';
+import { startRoomSweep, stopRoomSweep } from './room/room-manager.js';
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -51,6 +52,15 @@ if (config.nodeEnv === 'production') {
 
 // Register socket event handlers
 registerSocketHandlers(io);
+
+startRoomSweep({ intervalMs: config.cleanupIntervalMs });
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    stopRoomSweep();
+    process.exit(0);
+  });
+}
 
 httpServer.listen(config.port, () => {
   logger.info(`Server listening on port ${config.port}`);

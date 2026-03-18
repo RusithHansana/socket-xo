@@ -1,6 +1,6 @@
 import type { GameState, PlayerInfo } from 'shared';
 import { MAX_PLAYERS_PER_ROOM } from 'shared';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addPlayerToRoom,
   clearAllRooms,
@@ -11,10 +11,16 @@ import {
   getGameState,
   getRoom,
   getRoomByPlayerId,
+  markRoomAbandoned,
   markRoomCompleted,
+  ROOM_COMPLETION_CLEANUP_DELAY_MS,
+  ROOM_ORPHAN_MAX_AGE_MS,
+  runRoomSweepOnce,
   removeRoom,
+  scheduleRoomRemoval,
   updateRoomState,
 } from './room-manager.js';
+import { logger } from '../utils/logger.js';
 
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -57,6 +63,10 @@ function createFinishedState(roomId: string): GameState {
 describe('room-manager', () => {
   beforeEach(() => {
     clearAllRooms();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('6.2 — createRoom creates a room with UUID, players, and valid initial state', () => {
@@ -381,10 +391,11 @@ describe('room-manager', () => {
     markRoomCompleted(completedRoom.roomId);
 
     expect(getCompletedRooms()).toEqual([
-      {
+      expect.objectContaining({
         ...completedRoom,
         status: 'completed',
-      },
+        completedAt: expect.any(String),
+      }),
     ]);
     expect(getAllRooms()).toHaveLength(2);
     expect(activeRoom.status).toBe('active');
@@ -408,5 +419,106 @@ describe('room-manager', () => {
     );
 
     expect(getGameState(room.roomId)).toEqual(room.state);
+  });
+
+  it('6.1.1 — markRoomCompleted schedules delayed room removal after 5 seconds', () => {
+    vi.useFakeTimers();
+    const room = createRoom(
+      'player-1',
+      'player-2',
+      createPlayerInfo('player-1'),
+      createPlayerInfo('player-2'),
+    );
+
+    markRoomCompleted(room.roomId);
+
+    expect(getRoom(room.roomId)).not.toBeNull();
+    vi.advanceTimersByTime(ROOM_COMPLETION_CLEANUP_DELAY_MS - 1);
+    expect(getRoom(room.roomId)).not.toBeNull();
+
+    vi.advanceTimersByTime(1);
+    expect(getRoom(room.roomId)).toBeNull();
+  });
+
+  it('6.1.2 — scheduleRoomRemoval replaces previous timer for same room', () => {
+    vi.useFakeTimers();
+    const room = createRoom(
+      'player-1',
+      'player-2',
+      createPlayerInfo('player-1'),
+      createPlayerInfo('player-2'),
+    );
+
+    scheduleRoomRemoval(room.roomId, 5_000, 'completed');
+    scheduleRoomRemoval(room.roomId, 10_000, 'completed');
+
+    vi.advanceTimersByTime(5_000);
+    expect(getRoom(room.roomId)).not.toBeNull();
+
+    vi.advanceTimersByTime(5_000);
+    expect(getRoom(room.roomId)).toBeNull();
+  });
+
+  it('6.1.3 — markRoomAbandoned records abandonment timestamp', () => {
+    const room = createRoom(
+      'player-1',
+      'player-2',
+      createPlayerInfo('player-1'),
+      createPlayerInfo('player-2'),
+    );
+
+    const abandonedRoom = markRoomAbandoned(room.roomId);
+
+    expect(abandonedRoom?.abandonedAt).not.toBeNull();
+    expect(getRoom(room.roomId)?.abandonedAt).not.toBeNull();
+  });
+
+  it('6.1.4 — runRoomSweepOnce removes orphaned rooms older than 10 minutes and logs cleanup', () => {
+    vi.useFakeTimers();
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => logger);
+
+    vi.setSystemTime(new Date('2026-03-18T10:00:00.000Z'));
+    const oldAbandonedRoom = createRoom(
+      'player-1',
+      'player-2',
+      createPlayerInfo('player-1'),
+      createPlayerInfo('player-2'),
+    );
+    markRoomAbandoned(oldAbandonedRoom.roomId);
+
+    vi.setSystemTime(new Date('2026-03-18T10:11:00.000Z'));
+    const removedCount = runRoomSweepOnce();
+
+    expect(removedCount).toBe(1);
+    expect(getRoom(oldAbandonedRoom.roomId)).toBeNull();
+    expect(infoSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        roomId: oldAbandonedRoom.roomId,
+        reason: 'abandoned',
+        ageMs: expect.any(Number),
+      }),
+      'Removed orphaned room during periodic sweep',
+    );
+
+    infoSpy.mockRestore();
+  });
+
+  it('6.1.5 — runRoomSweepOnce keeps recent abandoned rooms', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-18T10:00:00.000Z'));
+
+    const room = createRoom(
+      'player-1',
+      'player-2',
+      createPlayerInfo('player-1'),
+      createPlayerInfo('player-2'),
+    );
+    markRoomAbandoned(room.roomId);
+
+    vi.setSystemTime(new Date('2026-03-18T10:09:59.000Z'));
+    const removedCount = runRoomSweepOnce({ orphanAgeMs: ROOM_ORPHAN_MAX_AGE_MS });
+
+    expect(removedCount).toBe(0);
+    expect(getRoom(room.roomId)).not.toBeNull();
   });
 });

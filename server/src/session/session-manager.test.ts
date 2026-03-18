@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearAllSessions,
   clearReconnectToken,
+  clearSessionRoomAssignment,
+  clearSessionRoomAssignments,
   getSession,
   getSessionBySocketId,
   issueReconnectToken,
@@ -154,5 +156,32 @@ describe('session-manager', () => {
     removeSession('player-1');
 
     expect(getSession('player-1')).toBeNull();
+  });
+
+  it('6.18 — clearSessionRoomAssignment clears only roomId for a player session', () => {
+    registerSession('player-1', 'socket-1');
+    const reconnectToken = issueReconnectToken('player-1', 'room-1');
+
+    clearSessionRoomAssignment('player-1');
+
+    expect(getSession('player-1')).toEqual({
+      playerId: 'player-1',
+      socketId: 'socket-1',
+      roomId: null,
+      reconnectToken,
+      connected: true,
+    });
+  });
+
+  it('6.19 — clearSessionRoomAssignments clears roomId for multiple players', () => {
+    registerSession('player-1', 'socket-1');
+    registerSession('player-2', 'socket-2');
+    issueReconnectToken('player-1', 'room-1');
+    issueReconnectToken('player-2', 'room-1');
+
+    clearSessionRoomAssignments(['player-1', 'player-2']);
+
+    expect(getSession('player-1')?.roomId).toBeNull();
+    expect(getSession('player-2')?.roomId).toBeNull();
   });
 });

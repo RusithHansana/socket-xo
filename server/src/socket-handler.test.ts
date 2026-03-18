@@ -6,10 +6,12 @@ const {
   mockGetGameState,
   mockUpdateRoomState,
   mockMarkRoomCompleted,
+  mockMarkRoomAbandoned,
   mockGetRoomByPlayerId,
   mockValidateMove,
   mockApplyMove,
   mockClearReconnectToken,
+  mockClearSessionRoomAssignments,
   mockRegisterSession,
   mockSetSessionSocketDisconnectHandler,
   mockGetSession,
@@ -39,10 +41,12 @@ const {
   mockGetGameState: vi.fn(),
   mockUpdateRoomState: vi.fn(),
   mockMarkRoomCompleted: vi.fn(),
+  mockMarkRoomAbandoned: vi.fn(),
   mockGetRoomByPlayerId: vi.fn(),
   mockValidateMove: vi.fn(),
   mockApplyMove: vi.fn(),
   mockClearReconnectToken: vi.fn(),
+  mockClearSessionRoomAssignments: vi.fn(),
   mockRegisterSession: vi.fn(),
   mockSetSessionSocketDisconnectHandler: vi.fn(),
   mockGetSession: vi.fn(),
@@ -78,6 +82,7 @@ vi.mock('./room/room-manager.js', () => ({
   getRoom: mockGetRoom,
   updateRoomState: mockUpdateRoomState,
   markRoomCompleted: mockMarkRoomCompleted,
+  markRoomAbandoned: mockMarkRoomAbandoned,
 }));
 
 vi.mock('./room/grace-timer.js', () => ({
@@ -108,6 +113,7 @@ vi.mock('./game/game-engine.js', () => ({
 
 vi.mock('./session/session-manager.js', () => ({
   clearReconnectToken: mockClearReconnectToken,
+  clearSessionRoomAssignments: mockClearSessionRoomAssignments,
   getSession: mockGetSession,
   issueReconnectToken: mockIssueReconnectToken,
   markDisconnected: mockMarkDisconnected,
@@ -191,12 +197,16 @@ function createState(overrides: Partial<GameState> = {}): GameState {
 }
 
 function createRoom(state: GameState = createState()) {
+  const now = new Date().toISOString();
   return {
     roomId: state.roomId,
     playerIds: state.players.map((player) => player.playerId),
     state,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
     status: state.phase === 'finished' ? 'completed' : 'active',
+    completedAt: state.phase === 'finished' ? now : null,
+    abandonedAt: null,
+    lastActivityAt: now,
   };
 }
 
@@ -500,6 +510,7 @@ describe('registerSocketHandlers make_move (online)', () => {
     expect(mockMarkRoomCompleted).toHaveBeenCalledWith('room-1');
     expect(mockClearReconnectToken).toHaveBeenCalledWith('player-1');
     expect(mockClearReconnectToken).toHaveBeenCalledWith('player-2');
+    expect(mockClearSessionRoomAssignments).toHaveBeenCalledWith(['player-1', 'player-2']);
   });
 });
 
@@ -713,12 +724,16 @@ describe('registerSocketHandlers direct room link flow', () => {
       ],
       phase: 'waiting',
     });
+    const now = new Date().toISOString();
     const waitingRoom = {
       roomId: 'room-waiting',
       playerIds: ['player-1'],
       state: waitingState,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
       status: 'waiting' as const,
+      completedAt: null,
+      abandonedAt: null,
+      lastActivityAt: now,
     };
 
     mockCreateWaitingRoom.mockReturnValue(waitingRoom);
@@ -954,6 +969,7 @@ describe('registerSocketHandlers disconnect/reconnect grace flow', () => {
     expect(mockUpdateRoomState).toHaveBeenCalledWith('room-1', expectedState);
     expect(mockStartGraceTimer).toHaveBeenCalledTimes(1);
     expect(mockStartGraceTimer).toHaveBeenCalledWith('player-1', 30_000, expect.any(Function));
+    expect(mockMarkRoomAbandoned).not.toHaveBeenCalled();
 
     const roomChannels = io.to.mock.results.map((result) => result.value as { emit: ReturnType<typeof vi.fn> });
     expect(roomChannels).toHaveLength(2);
@@ -1007,6 +1023,7 @@ describe('registerSocketHandlers disconnect/reconnect grace flow', () => {
     expect(mockMarkRoomCompleted).toHaveBeenCalledWith('room-1');
     expect(mockClearReconnectToken).toHaveBeenCalledWith('player-1');
     expect(mockClearReconnectToken).toHaveBeenCalledWith('player-2');
+    expect(mockClearSessionRoomAssignments).toHaveBeenCalledWith(['player-1', 'player-2']);
 
     const roomChannels = io.to.mock.results.map((result) => result.value as { emit: ReturnType<typeof vi.fn> });
     const gameOverChannel = roomChannels[roomChannels.length - 1];
@@ -1372,5 +1389,6 @@ describe('registerSocketHandlers disconnect/reconnect grace flow', () => {
 
     expect(mockUpdateRoomState).toHaveBeenCalledWith('room-1', expectedFinalState);
     expect(mockMarkRoomCompleted).toHaveBeenCalledWith('room-1');
+    expect(mockMarkRoomAbandoned).toHaveBeenCalledWith('room-1');
   });
 });

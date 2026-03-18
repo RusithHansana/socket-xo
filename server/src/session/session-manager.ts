@@ -113,6 +113,25 @@ export function clearReconnectToken(playerId: string): void {
   });
 }
 
+export function clearSessionRoomAssignment(playerId: string): void {
+  const session = getSession(playerId);
+
+  if (session === null) {
+    return;
+  }
+
+  sessions.set(playerId, {
+    ...session,
+    roomId: null,
+  });
+}
+
+export function clearSessionRoomAssignments(playerIds: readonly string[]): void {
+  for (const playerId of playerIds) {
+    clearSessionRoomAssignment(playerId);
+  }
+}
+
 export function markDisconnected(socketId: string): PlayerSession | null {
   const session = getSessionBySocketId(socketId);
 

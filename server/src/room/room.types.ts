@@ -6,4 +6,7 @@ export interface GameRoom {
   state: GameState;
   createdAt: string;
   status: 'waiting' | 'active' | 'completed';
+  completedAt: string | null;
+  abandonedAt: string | null;
+  lastActivityAt: string;
 }
