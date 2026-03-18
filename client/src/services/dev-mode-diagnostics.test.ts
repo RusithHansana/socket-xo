@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEV_MODE_LAG_MAX_MS,
   DEV_MODE_LAG_MIN_MS,
@@ -12,7 +12,12 @@ import {
 } from './dev-mode-diagnostics';
 
 describe('dev-mode-diagnostics service', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_DEV_MODE', 'true');
+  });
+
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.useRealTimers();
     resetDevModeDiagnosticsForTests();
   });

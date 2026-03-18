@@ -67,8 +67,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   );
   const [prevDeps, setPrevDeps] = useState({ playerId, displayName, avatarUrl });
   const instrumentedSocket = useMemo(
-    () => (socket === null ? null : createInstrumentedSocket(socket)),
-    [socket],
+    () => {
+      if (socket === null) {
+        return null;
+      }
+      return import.meta.env.VITE_DEV_MODE === 'true'
+        ? createInstrumentedSocket(socket)
+        : socket;
+    },
+    [socket]
   );
 
   if (
@@ -84,11 +91,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     if (!instrumentedSocket) return;
     
     dispatch({ type: 'SET_CONNECTING' });
-    appendDevModeSocketLog('lifecycle', 'connect_requested');
+    if (import.meta.env.VITE_DEV_MODE === 'true') {
+      appendDevModeSocketLog('lifecycle', 'connect_requested');
+    }
     instrumentedSocket.connect();
 
     return () => {
-      appendDevModeSocketLog('lifecycle', 'disconnect_requested');
+      if (import.meta.env.VITE_DEV_MODE === 'true') {
+        appendDevModeSocketLog('lifecycle', 'disconnect_requested');
+      }
       instrumentedSocket.disconnect();
     };
   }, [instrumentedSocket, dispatch]);

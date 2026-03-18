@@ -74,6 +74,11 @@ export function appendDevModeSocketLog(
   eventName: string,
   details?: string,
 ): void {
+  // @ts-expect-error - standard vitest behavior might lack import.meta.env in non-component tests depending on suite config
+  if (import.meta.env.VITE_DEV_MODE !== 'true') {
+    return;
+  }
+
   const nextEntry: DevModeLogEntry = {
     id: nextLogId,
     timestampIso: new Date().toISOString(),
@@ -99,6 +104,12 @@ export function getDevModeLagDelayMs(): number | null {
 }
 
 export function runWithDevModeLag(task: () => void): void {
+  // @ts-expect-error
+  if (import.meta.env.VITE_DEV_MODE !== 'true') {
+    task();
+    return;
+  }
+
   const lagDelay = getDevModeLagDelayMs();
 
   if (lagDelay === null) {
