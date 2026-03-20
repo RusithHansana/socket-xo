@@ -26,7 +26,7 @@ test.describe('Story 6.4 acceptance - disconnect and reconnect scenarios', () =>
 
       await match.context2.setOffline(true);
       await match.page2.evaluate(() => { if ((window as any).socket) (window as any).socket.io.engine.close(); });
-      await expect(match.page2.getByText(/reconnecting/i)).toBeVisible({ timeout: 15000 });
+      await expect(match.page2.getByRole('heading', { name: /reconnecting/i })).toBeVisible({ timeout: 15000 });
 
       const reconnectStartMs = Date.now();
       await match.context2.setOffline(false);
@@ -79,7 +79,7 @@ test.describe('Story 6.4 acceptance - disconnect and reconnect scenarios', () =>
 
       await match.context2.setOffline(true);
       await match.page2.evaluate(() => { if ((window as any).socket) (window as any).socket.io.engine.close(); });
-      await expect(match.page2.getByText(/reconnecting/i)).toBeVisible({ timeout: 15000 });
+      await expect(match.page2.getByRole('heading', { name: /reconnecting/i })).toBeVisible({ timeout: 15000 });
       await match.context2.setOffline(false);
       await expect(match.page2.getByText(/welcome back!/i)).toBeVisible();
       await expect(match.page2.getByText(/welcome back!/i)).not.toBeVisible();
