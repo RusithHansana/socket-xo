@@ -1,46 +1,19 @@
 import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
 import path from 'path';
 import { config } from './config.js';
 import { logger } from './utils/logger.js';
-import { registerSocketHandlers } from './socket-handler.js';
-import { startRoomSweep, stopRoomSweep } from './room/room-manager.js';
-import type {
-  ClientToServerEvents,
-  ServerToClientEvents,
-  InterServerEvents,
-  SocketData,
-} from 'shared';
+import { createApp } from './app.js';
 
-const app = express();
-const httpServer = createServer(app);
-
-const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(
-  httpServer,
-  {
-    cors: {
-      origin: config.corsOrigin,
-      methods: ['GET', 'POST'],
-    },
-  },
-);
-
-io.use((socket, next) => {
-  const playerId = socket.handshake.auth.playerId;
-  if (typeof playerId !== 'string' || playerId.trim() === '') {
-    return next(new Error('Missing playerId'));
-  }
-  socket.data.playerId = playerId;
-  socket.data.roomId = null;
-  next();
+const appInstance = createApp({
+  corsOrigin: config.corsOrigin,
+  cleanupIntervalMs: config.cleanupIntervalMs,
 });
 
 // In production, serve Vite-built SPA
 if (config.nodeEnv === 'production') {
   const clientDist = path.join(__dirname, '../../client/dist');
-  app.use(express.static(clientDist));
-  app.get('*', (_req, res) => {
+  appInstance.expressApp.use(express.static(clientDist));
+  appInstance.expressApp.get('*', (_req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'), (err) => {
       if (err) {
         logger.error({ err }, 'Failed to serve SPA index.html');
@@ -50,18 +23,17 @@ if (config.nodeEnv === 'production') {
   });
 }
 
-// Register socket event handlers
-registerSocketHandlers(io);
-
-startRoomSweep({ intervalMs: config.cleanupIntervalMs });
-
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
-    stopRoomSweep();
-    process.exit(0);
+    appInstance.stop().finally(() => {
+      process.exit(0);
+    });
   });
 }
 
-httpServer.listen(config.port, () => {
-  logger.info(`Server listening on port ${config.port}`);
+appInstance.start(config.port).then((port) => {
+  logger.info(`Server listening on port ${port}`);
+}).catch((err) => {
+  logger.error({ err }, 'Failed to start server');
+  process.exit(1);
 });
