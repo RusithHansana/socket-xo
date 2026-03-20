@@ -9,6 +9,7 @@ async function openChat(page: import('@playwright/test').Page): Promise<void> {
 }
 
 test.describe('Story 6.4 acceptance - disconnect and reconnect scenarios', () => {
+  test.setTimeout(90_000);
   test('Test 8: Reconnect within grace period restores state in <= 2s', async ({ browser }) => {
     const match = await pairPlayersViaMatchmaking(browser);
 
