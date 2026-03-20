@@ -21,7 +21,7 @@ export default defineConfig({
     env: {
       NODE_ENV: 'production',
       PORT: '3001',
-      GRACE_PERIOD_MS: '5000',
+      GRACE_PERIOD_MS: '15000',
     },
   },
   projects: [

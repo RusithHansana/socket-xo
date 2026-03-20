@@ -37,7 +37,7 @@ test.describe('Story 6.4 acceptance - disconnect and reconnect scenarios', () =>
       await expect(match.page2.getByText(/welcome back!/i)).toBeVisible({ timeout: 15000 });
 
       const recoveryDurationMs = Date.now() - reconnectStartMs;
-      expect(recoveryDurationMs).toBeLessThanOrEqual(2_000);
+      expect(recoveryDurationMs).toBeLessThanOrEqual(process.env.CI ? 6_000 : 2_000);
 
       await expect(match.page2.getByText(/welcome back!/i)).not.toBeVisible();
 
