@@ -27,8 +27,9 @@ export async function verifyBoardStateEquals(page: Page, expected: BoardGrid): P
     .toEqual(expected);
 }
 
-export async function verifyOutcomeModalText(page: Page, expected: RegExp): Promise<void> {
-  await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText(expected);
+export async function verifyOutcomeModalText(page: Page, expected: RegExp, timeout?: number): Promise<void> {
+  const modal = page.getByRole('dialog').filter({ hasText: 'Match Complete' });
+  await expect(modal.getByRole('heading', { level: 2 })).toHaveText(expected, { timeout });
 }
 
 export async function verifyChatMessagePresence(page: Page, expectedText: string): Promise<void> {

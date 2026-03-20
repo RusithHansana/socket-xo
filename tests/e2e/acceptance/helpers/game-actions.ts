@@ -76,13 +76,14 @@ export async function assertBoardCellContent(
 }
 
 export async function assertGameOutcomeModalContent(page: Page, expectedHeading: RegExp): Promise<void> {
-  const modal = page.getByRole('dialog');
+  const modal = page.getByRole('dialog').filter({ hasText: 'Match Complete' });
   await expect(modal).toBeVisible();
   await expect(modal.getByRole('heading', { level: 2 })).toHaveText(expectedHeading);
 }
 
 export async function returnToLobbyFromOutcomeModal(page: Page): Promise<void> {
-  const backButton = page.getByRole('button', { name: /back to lobby/i });
+  const modal = page.getByRole('dialog').filter({ hasText: 'Match Complete' });
+  const backButton = modal.getByRole('button', { name: /back to lobby/i });
   await expect(backButton).toBeVisible();
   await backButton.click();
   await expect(page).toHaveURL(/\/$/);

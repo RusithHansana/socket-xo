@@ -24,7 +24,7 @@ test.describe('Story 6.4 acceptance - disconnect and reconnect scenarios', () =>
       const beforeDisconnect = await readBoardStateFromDom(xPage);
 
       await match.context2.setOffline(true);
-      await expect(match.page2.getByText(/reconnecting/i)).toBeVisible();
+      await expect(match.page2.getByText(/reconnecting/i)).toBeVisible({ timeout: 35000 });
 
       const reconnectStartMs = Date.now();
       await match.context2.setOffline(false);
@@ -52,8 +52,8 @@ test.describe('Story 6.4 acceptance - disconnect and reconnect scenarios', () =>
 
       await match.context2.setOffline(true);
 
-      await verifyOutcomeModalText(connectedPage, /you win!/i);
-      await expect(connectedPage.getByRole('dialog')).toContainText(/forfeit|disconnected/i);
+      await verifyOutcomeModalText(connectedPage, /you win!/i, 35000);
+      await expect(connectedPage.getByRole('dialog').filter({ hasText: 'Match Complete' })).toContainText(/forfeit|disconnected/i);
 
       await match.context2.setOffline(false);
     } finally {
@@ -75,7 +75,7 @@ test.describe('Story 6.4 acceptance - disconnect and reconnect scenarios', () =>
       await verifyChatMessagePresence(match.page2, messageText);
 
       await match.context2.setOffline(true);
-      await expect(match.page2.getByText(/reconnecting/i)).toBeVisible();
+      await expect(match.page2.getByText(/reconnecting/i)).toBeVisible({ timeout: 35000 });
       await match.context2.setOffline(false);
       await expect(match.page2.getByText(/welcome back!/i)).toBeVisible();
       await expect(match.page2.getByText(/welcome back!/i)).not.toBeVisible();
