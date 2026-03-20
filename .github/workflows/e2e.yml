@@ -34,6 +34,9 @@ jobs:
       - name: Run E2E tests
         run: npm run test:e2e
 
+      - name: Run acceptance E2E gate
+        run: npm run test:e2e:acceptance
+
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}

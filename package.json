@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
+    "test:e2e:acceptance": "playwright test --config tests/e2e/playwright.config.ts tests/e2e/acceptance/",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
