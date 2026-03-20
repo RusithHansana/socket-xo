@@ -1,4 +1,4 @@
-import type { Symbol } from './game.types';
+import type { Symbol } from './game.types.js';
 
 /** Persistent guest profile stored client-side (localStorage) and sent on connect. */
 export interface GuestIdentity {

@@ -1,5 +1,5 @@
-import type { GameState, MovePayload } from './game.types';
-import type { ChatMessage } from './chat.types';
+import type { GameState, MovePayload } from './game.types.js';
+import type { ChatMessage } from './chat.types.js';
 
 /** Inter-server events — empty for single-server MVP. Reserved for future horizontal scaling. */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type

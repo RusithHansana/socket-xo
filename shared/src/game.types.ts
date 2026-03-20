@@ -1,5 +1,5 @@
-import type { PlayerInfo } from './player.types';
-import type { ChatMessage } from './chat.types';
+import type { PlayerInfo } from './player.types.js';
+import type { ChatMessage } from './chat.types.js';
 
 /** The two possible piece symbols a player can be assigned. */
 export type Symbol = 'X' | 'O';
