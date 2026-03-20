@@ -68,3 +68,23 @@ To start the production server (which serves the built SPA as static files along
 ```bash
 npm start
 ```
+
+### Testing
+
+**Unit & Integration Tests (local):**
+
+```bash
+npm test
+```
+
+This runs all Vitest tests across `client/`, `server/`, `shared/`, and `tests/integration/`.
+
+**End-to-End Tests (CI only):**
+
+E2E tests use Playwright and run automatically via GitHub Actions on push/PR to `main`. Playwright browser binaries are not compatible with some Linux distros, so E2E tests are designed for Ubuntu CI runners. To trigger manually, use the "workflow_dispatch" option in the GitHub Actions tab.
+
+```bash
+# Only works where Playwright browsers are installed (CI or compatible Linux distros)
+npm run test:e2e
+```
+

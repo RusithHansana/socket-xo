@@ -12,10 +12,12 @@
     "build": "npm run build --workspace=shared && npm run build --workspace=client && npm run build --workspace=server",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@typescript-eslint/eslint-plugin": "latest",
     "@typescript-eslint/parser": "latest",
     "concurrently": "latest",
