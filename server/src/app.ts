@@ -14,6 +14,7 @@ import { clearAllSessions } from './session/session-manager.js';
 import { config } from './config.js';
 
 export type AppInstance = {
+  expressApp: express.Express;
   httpServer: HttpServer;
   io: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
   start: (port?: number) => Promise<number>;
@@ -93,5 +94,5 @@ export function createApp(options?: {
     }
   }
 
-  return { httpServer, io, start, stop };
+  return { expressApp: app, httpServer, io, start, stop };
 }
