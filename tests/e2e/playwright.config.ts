@@ -13,7 +13,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'npm run build && node ../../server/dist/index.js',
+    command: 'npm run build && node server/dist/index.js',
     port: 3001,
     reuseExistingServer: !process.env.CI,
     cwd: '../../',
