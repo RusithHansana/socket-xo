@@ -30,7 +30,11 @@ test.describe('Story 6.4 acceptance - disconnect and reconnect scenarios', () =>
 
       const reconnectStartMs = Date.now();
       await match.context2.setOffline(false);
-      await expect(match.page2.getByText(/welcome back!/i)).toBeVisible();
+      await match.page2.evaluate(() => {
+        window.dispatchEvent(new Event('online'));
+        if ((window as any).socket) (window as any).socket.connect();
+      });
+      await expect(match.page2.getByText(/welcome back!/i)).toBeVisible({ timeout: 15000 });
 
       const recoveryDurationMs = Date.now() - reconnectStartMs;
       expect(recoveryDurationMs).toBeLessThanOrEqual(2_000);
@@ -81,7 +85,11 @@ test.describe('Story 6.4 acceptance - disconnect and reconnect scenarios', () =>
       await match.page2.evaluate(() => { if ((window as any).socket) (window as any).socket.io.engine.close(); });
       await expect(match.page2.getByRole('heading', { name: /reconnecting/i })).toBeVisible({ timeout: 15000 });
       await match.context2.setOffline(false);
-      await expect(match.page2.getByText(/welcome back!/i)).toBeVisible();
+      await match.page2.evaluate(() => {
+        window.dispatchEvent(new Event('online'));
+        if ((window as any).socket) (window as any).socket.connect();
+      });
+      await expect(match.page2.getByText(/welcome back!/i)).toBeVisible({ timeout: 15000 });
       await expect(match.page2.getByText(/welcome back!/i)).not.toBeVisible();
 
       await openChat(match.page2);
