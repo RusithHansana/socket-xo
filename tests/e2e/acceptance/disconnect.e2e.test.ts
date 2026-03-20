@@ -4,8 +4,11 @@ import { cleanupPairedMatch, pairPlayersViaMatchmaking } from './helpers/matchma
 import { readBoardStateFromDom, verifyChatMessagePresence, verifyOutcomeModalText } from './helpers/assertions';
 
 async function openChat(page: import('@playwright/test').Page): Promise<void> {
-  await page.getByRole('button', { name: /open chat/i }).click();
-  await expect(page.getByRole('dialog', { name: /chat/i })).toBeVisible();
+  const dialog = page.getByRole('dialog', { name: /chat/i });
+  if (!(await dialog.isVisible())) {
+    await page.getByRole('button', { name: /open chat/i }).click();
+  }
+  await expect(dialog).toBeVisible();
 }
 
 test.describe('Story 6.4 acceptance - disconnect and reconnect scenarios', () => {
