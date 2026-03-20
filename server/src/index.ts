@@ -13,7 +13,7 @@ const appInstance = createApp({
 if (config.nodeEnv === 'production') {
   const clientDist = path.join(__dirname, '../../client/dist');
   appInstance.expressApp.use(express.static(clientDist));
-  appInstance.expressApp.get('*', (_req, res) => {
+  appInstance.expressApp.get(/.*/, (_req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'), (err) => {
       if (err) {
         logger.error({ err }, 'Failed to serve SPA index.html');
