@@ -128,13 +128,13 @@ async function playUntilOutcome(page: Page, pickMove: (board: BoardGrid) => Move
     await expect
       .poll(async () => {
         if (await page.getByRole('dialog').isVisible().catch(() => false)) {
-          return 'game-over';
+          return true;
         }
 
         const text = (await page.getByText(/your turn|opponent's turn/i).first().textContent())?.trim() ?? '';
-        return text;
+        return /your turn/i.test(text);
       })
-      .toSatisfy((value) => value === 'game-over' || /your turn/i.test(value));
+      .toBe(true);
   }
 }
 
