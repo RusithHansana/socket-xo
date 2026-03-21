@@ -90,7 +90,7 @@ export default function OnlineGamePage() {
     if (status === 'disconnected' || status === 'game_over' || gameState.outcome !== null) {
       nextShowRecoveredOverlay = false;
     } else if (
-      previousStatus === 'disconnected' &&
+      (previousStatus === 'disconnected' || previousStatus === 'reconnecting') &&
       status === 'in_game' &&
       gameState.phase === 'playing' &&
       gameState.outcome === null
