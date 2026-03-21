@@ -4,6 +4,11 @@ import { config } from './config.js';
 import { logger } from './utils/logger.js';
 import { createApp } from './app.js';
 
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const appInstance = createApp({
   corsOrigin: config.corsOrigin,
   cleanupIntervalMs: config.cleanupIntervalMs,
