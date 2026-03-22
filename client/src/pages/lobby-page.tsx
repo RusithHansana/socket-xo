@@ -15,13 +15,30 @@ function OnlineIcon() {
   return (
     <svg viewBox="0 0 24 24" className={styles.cardIcon} focusable="false" aria-hidden="true">
       <path
-        d="M4 17a8 8 0 0 1 16 0M7.5 13.5a4.5 4.5 0 0 1 9 0M12 18.5h.01"
+        d="M3 11.5a12 12 0 0 1 18 0"
         fill="none"
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="1.8"
       />
+      <path
+        d="M6 14.5a8 8 0 0 1 12 0"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M9 17.5a4 4 0 0 1 6 0"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <circle cx="12" cy="20" r="0.9" fill="currentColor" />
     </svg>
   );
 }
@@ -45,7 +62,15 @@ function LinkIcon() {
   return (
     <svg viewBox="0 0 24 24" className={styles.cardIcon} focusable="false" aria-hidden="true">
       <path
-        d="M10 13.5 14 9.5m-5.5 6a3.5 3.5 0 0 1 0-5l2-2a3.5 3.5 0 1 1 5 5l-.75.75m-5 5-.75.75a3.5 3.5 0 1 1-5-5l2-2a3.5 3.5 0 0 1 5 0"
+        d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 1 0-7.07-7.07L11 4"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 19"
         fill="none"
         stroke="currentColor"
         strokeLinecap="round"
